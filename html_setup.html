@@ -2,9 +2,15 @@
     <div class="info-panel">
         <div class="flex-between">
             <p id="currentPos">ROV: </p>
-            <button id="toggleTargetContainer" class="toggle-target-btn">
-                <i class="mdi mdi-menu"></i>
-            </button>
+            <div>
+                <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target">
+                    <i class="mdi mdi-cancel"></i>
+                </button>
+                <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target">
+                    <i class="mdi mdi-menu"></i>
+                </button>
+            </div>
+            
         </div>
 
         <div id="targetContainer">

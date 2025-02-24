@@ -1,4 +1,3 @@
-// Canvas setup
 const canvas = document.getElementById('mapCanvas');
 const ctx = canvas.getContext('2d');
 const positionDisplay = document.getElementById('currentPos');
@@ -37,7 +36,7 @@ const LINES = {
     trail: 2,
     target: 3,
     targetLine: 1
-}
+};
 
 // Transformation variables for pan & zoom
 let scale = 1;
@@ -66,9 +65,7 @@ function metersToPixels(meters, scaleFactor = BASE_SCALE) {
     return meters * scaleFactor;
 }
 
-// New helper: converts world (meters) coordinates to screen coordinates,
-// applying pan and zoom for position only. Note that drawn icons will be
-// rendered using constant pixel sizes.
+// Converts world (meters) coordinates to screen coordinates.
 function worldToScreen(meters) {
     return {
         x: canvas.width / 2 + panX + metersToPixels(meters.x) * scale,
@@ -81,10 +78,59 @@ function calculateLatLonDistance(pos1, pos2) {
     return Math.sqrt(meters.x * meters.x + meters.y * meters.y);
 }
 
-// --------- Target Management Functions --------- //
+// ------------------ Cookie Persistence Functions ------------------ //
+
+// Sets a cookie with a name, value and expiration in days.
+function setCookie(name, value, days) {
+    const d = new Date();
+    d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+    const expires = "expires=" + d.toUTCString();
+    document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
+}
+
+// Gets a cookie value by its name.
+function getCookie(name) {
+    const cname = name + "=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for (let c of ca) {
+        while (c.charAt(0) === ' ') { c = c.substring(1); }
+        if (c.indexOf(cname) === 0) {
+            return c.substring(cname.length, c.length);
+        }
+    }
+    return "";
+}
+
+// ------------------ Target Persistence using Cookies ------------------ //
+
+function loadTargets() {
+    const cookieVal = getCookie('cockpit-trail-widget-targets');
+    if (cookieVal) {
+        try {
+            targets = JSON.parse(cookieVal);
+            // If there are any targets, automatically select the first target
+            if (targets && targets.length > 0) {
+                activeTargetIndex = 0;
+                const container = document.getElementById('addedTargetsContainer');
+                container.innerHTML = '';
+                targets.forEach((target, index) => {
+                    createTargetEntry(index);
+                });
+            }
+        } catch (e) {
+            console.error('Error parsing targets cookie', e);
+        }
+    }
+}
+
+function saveTargets() {
+    setCookie('cockpit-trail-widget-targets', JSON.stringify(targets), 365);
+}
+
+// ------------------ Target Management Functions ------------------ //
 
 // Creates an entry for a target using the persistent new-target style.
-// The target's coordinates are shown within a span rather than in an editable input.
 function createTargetEntry(index) {
     const inputGroup = document.createElement('div');
     inputGroup.className = 'target-input-group';
@@ -128,8 +174,8 @@ function createTargetEntry(index) {
     // Set initial target coordinates in the input field.
     const targetInput = inputGroup.querySelector('.targetCoords');
     targetInput.value = `${targets[index].lat}, ${targets[index].lon}`;
-    
-    // Allow the user to update the target value on Enter key press.
+
+    // Allow updating the target on Enter key press.
     targetInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
             const value = targetInput.value;
@@ -144,33 +190,33 @@ function createTargetEntry(index) {
                 console.log('Invalid coordinates');
                 return;
             }
-            // Update the underlying targets array.
             targets[index] = { lat, lon };
             targetInput.value = `${lat}, ${lon}`;
             draw();
+            saveTargets();
         }
     });
-    
+
     // Setup reorder buttons.
     const upBtn = inputGroup.querySelector('.reorder-up');
     const downBtn = inputGroup.querySelector('.reorder-down');
     upBtn.addEventListener('click', () => {
         if (index > 0) {
-            // Swap with the previous target.
             [targets[index - 1], targets[index]] = [targets[index], targets[index - 1]];
             compactTargets();
             draw();
+            saveTargets();
         }
     });
     downBtn.addEventListener('click', () => {
         if (index < targets.length - 1) {
-            // Swap with the next target.
             [targets[index], targets[index + 1]] = [targets[index + 1], targets[index]];
             compactTargets();
             draw();
+            saveTargets();
         }
     });
-    
+
     document.getElementById('addedTargetsContainer').appendChild(inputGroup);
     setupTargetEntryListeners(inputGroup, index);
 }
@@ -178,48 +224,38 @@ function createTargetEntry(index) {
 function setupTargetEntryListeners(inputGroup, index) {
     const selectBtn = inputGroup.querySelector('.select-target');
     const removeBtn = inputGroup.querySelector('.remove-target');
-
     selectBtn.addEventListener('click', () => {
         activeTargetIndex = index;
         draw();
     });
-
     removeBtn.addEventListener('click', () => {
         targets.splice(index, 1);
         compactTargets();
         draw();
+        saveTargets();
     });
 }
 
-// Rebuilds the target entries after a deletion or modification.
 function compactTargets() {
-    // Remove any null values and rebuild the array.
     targets = targets.filter(target => target !== null);
-    
     const container = document.getElementById('addedTargetsContainer');
-    container.innerHTML = ''; // Clear existing entries
-
+    container.innerHTML = '';
     targets.forEach((target, index) => {
         createTargetEntry(index);
-        // Restore the target coordinates in the span element
         const targetSpan = container.querySelector(`.target-input-group[data-index="${index}"] .targetCoords`);
         if (targetSpan) {
             targetSpan.textContent = `${target.lat}, ${target.lon}`;
         }
     });
-
-    // Update active target index if needed.
     if (activeTargetIndex !== -1) {
         activeTargetIndex = targets.findIndex((target, i) => i === activeTargetIndex);
     }
 }
 
-// Setup the persistent "New Target" input handling.
 function setupNewTargetInput() {
     const newTargetGroup = document.getElementById('newTargetInput');
     const input = newTargetGroup.querySelector('.newTargetCoords');
     const addBtn = newTargetGroup.querySelector('.add-new-target');
-
     const submitNewTarget = () => {
         const value = input.value;
         const coords = value.split(',');
@@ -233,15 +269,14 @@ function setupNewTargetInput() {
             console.log('Invalid coordinates');
             return;
         }
-        // Append new target and update display.
         const newIndex = targets.length;
         targets.push({ lat, lon });
         createTargetEntry(newIndex);
         activeTargetIndex = newIndex;
         draw();
         input.value = '';
+        saveTargets();
     };
-
     addBtn.addEventListener('click', submitNewTarget);
     input.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
@@ -251,35 +286,31 @@ function setupNewTargetInput() {
     });
 }
 
-// Initialize persistent new target input on startup.
+// Initialize persistent new target input on startup and load any saved targets.
 setupNewTargetInput();
+loadTargets();
 
-// --------- Drawing Functions --------- //
+// ------------------ Drawing Functions ------------------ //
 
 function drawROVIcon(x, y, heading) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(heading * (Math.PI / 180));
-
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 30;
-
-    // Draw a single arrow shape with constant dimensions.
     ctx.beginPath();
-    ctx.moveTo(0, -10); // Top vertex
-    ctx.lineTo(10, 10); // Bottom right vertex
-    ctx.lineTo(0, 5); // Middle bottom vertex
-    ctx.lineTo(-10, 10); // Bottom left vertex
+    ctx.moveTo(0, -10);
+    ctx.lineTo(10, 10);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(-10, 10);
     ctx.closePath();
     ctx.fillStyle = 'white';
     ctx.fill();
-
     ctx.restore();
 }
 
 function drawROV() {
     if (!firstPoint || !currentPosition.lat || !currentPosition.lon) return;
-
     const meters = latLonToMeters(currentPosition.lat, currentPosition.lon, firstPoint.lat, firstPoint.lon);
     const pixels = worldToScreen(meters);
     drawROVIcon(pixels.x, pixels.y, currentHeading);
@@ -287,14 +318,11 @@ function drawROV() {
 
 function drawTrailPath() {
     if (!firstPoint || trail.length < 2) return;
-
     ctx.strokeStyle = COLORS.trail;
     ctx.lineWidth = LINES.trail;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 10;
-
     ctx.beginPath();
-
     trail.forEach((point, index) => {
         const meters = latLonToMeters(point.lat, point.lon, firstPoint.lat, firstPoint.lon);
         const pixels = worldToScreen(meters);
@@ -309,19 +337,15 @@ function drawTrailPath() {
 
 function drawTarget() {
     if (!firstPoint || !targets.length || !currentPosition.lat || !currentPosition.lon) return;
-    
-    // Draw connecting lines between targets.
     ctx.beginPath();
     ctx.strokeStyle = '#999999';
     ctx.lineWidth = LINES.targetLine;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 10;
-    
     targets.forEach((target, index) => {
         if (!target) return;
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
         const targetPixels = worldToScreen(targetMeters);
-
         if (index > 0 && targets[index - 1]) {
             const prevMeters = latLonToMeters(targets[index - 1].lat, targets[index - 1].lon, firstPoint.lat, firstPoint.lon);
             const prevPixels = worldToScreen(prevMeters);
@@ -330,8 +354,6 @@ function drawTarget() {
         }
     });
     ctx.stroke();
-
-    // Draw dotted line to active target if selected.
     if (activeTargetIndex !== -1 && targets[activeTargetIndex]) {
         const target = targets[activeTargetIndex];
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
@@ -346,8 +368,6 @@ function drawTarget() {
         ctx.lineWidth = LINES.targetLine;
         ctx.stroke();
         ctx.setLineDash([]);
-
-        // Calculate midpoint and the distance between current position and target.
         const midX = (currentPixels.x + targetPixels.x) / 2;
         const midY = (currentPixels.y + targetPixels.y) / 2;
         const distanceMeters = calculateLatLonDistance(currentPosition, target);
@@ -356,13 +376,10 @@ function drawTarget() {
         ctx.textAlign = 'center';
         ctx.fillText(distanceMeters.toFixed(0) + ' m', midX, midY);
     }
-    
-    // Draw all target markers.
     targets.forEach((target, index) => {
         if (!target) return;
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
         const targetPixels = worldToScreen(targetMeters);
-
         ctx.beginPath();
         const size = 8;
         ctx.moveTo(targetPixels.x - size, targetPixels.y - size);
@@ -376,8 +393,8 @@ function drawTarget() {
 }
 
 function getGridSpacing() {
-    const candidateSteps = [1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]; // in meters
-    const minPixelSpacing = 40; // minimum spacing in pixels
+    const candidateSteps = [1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+    const minPixelSpacing = 40;
     const effectiveScale = BASE_SCALE * scale;
     for (let step of candidateSteps) {
         if (step * effectiveScale >= minPixelSpacing) {
@@ -389,22 +406,15 @@ function getGridSpacing() {
 
 function drawGrid() {
     if (!firstPoint) return;
-    
     const gridSpacing = getGridSpacing();
     const effectiveMultiplier = BASE_SCALE * scale;
-    
-    // Inverse conversion: world coordinates (in meters relative to firstPoint)
-    // corresponding to the canvas edges.
     const leftMeters = (0 - canvas.width / 2 - panX) / effectiveMultiplier;
     const rightMeters = (canvas.width - canvas.width / 2 - panX) / effectiveMultiplier;
     const topMeters = (0 - canvas.height / 2 - panY) / effectiveMultiplier;
     const bottomMeters = (canvas.height - canvas.height / 2 - panY) / effectiveMultiplier;
-    
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(68, 68, 68, 0.5)";
+    ctx.strokeStyle = "rgba(68, 68, 68, 0.2)";
     ctx.lineWidth = 1;
-    
-    // Draw vertical grid lines.
     const startX = Math.floor(leftMeters / gridSpacing) * gridSpacing;
     const endX = Math.ceil(rightMeters / gridSpacing) * gridSpacing;
     for (let x = startX; x <= endX; x += gridSpacing) {
@@ -413,8 +423,6 @@ function drawGrid() {
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(endPoint.x, endPoint.y);
     }
-    
-    // Draw horizontal grid lines.
     const startY = Math.floor(topMeters / gridSpacing) * gridSpacing;
     const endY = Math.ceil(bottomMeters / gridSpacing) * gridSpacing;
     for (let y = startY; y <= endY; y += gridSpacing) {
@@ -423,22 +431,16 @@ function drawGrid() {
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(endPoint.x, endPoint.y);
     }
-    
     ctx.stroke();
 }
 
 function drawScaleIndicator() {
-    // Get current grid spacing
     const gridSpacing = getGridSpacing();
     const effectiveMultiplier = BASE_SCALE * scale;
     const lineWidth = gridSpacing * effectiveMultiplier;
     const margin = 10;
-
     ctx.save();
-    // Reset transformation so that the indicator is fixed to the canvas.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    
-    // Draw horizontal line in bottom left.
     const x = margin;
     const y = canvas.height - margin;
     ctx.beginPath();
@@ -447,8 +449,6 @@ function drawScaleIndicator() {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
     ctx.stroke();
-
-    // Draw vertical lines at both ends
     ctx.beginPath();
     ctx.moveTo(x, y - 5);
     ctx.lineTo(x, y + 5);
@@ -457,37 +457,27 @@ function drawScaleIndicator() {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
     ctx.stroke();
-
-    // Draw the grid spacing text above the line.
     ctx.font = "12px sans-serif";
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.fillText(gridSpacing + " m", x + lineWidth / 2, y - 5);
-    
     ctx.restore();
 }
 
-// Updated draw() without applying a global scale transform.
-// All pan & zoom are incorporated via worldToScreen().
 function draw() {
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw grid first
     drawGrid();
-    
     drawTrailPath();
     drawTarget();
     drawROV();
-    
     ctx.restore();
-
     drawScaleIndicator();
 }
 
-// --------- User Interaction: Panning & Zooming --------- //
+// ------------------ User Interaction ------------------ //
 
-// Handle panning via mouse drag.
+// Panning
 canvas.addEventListener('mousedown', (e) => {
     isPanning = true;
     startPan.x = e.clientX;
@@ -503,46 +493,33 @@ canvas.addEventListener('mousemove', (e) => {
     startPan.y = e.clientY;
     draw();
 });
-canvas.addEventListener('mouseup', () => {
-    isPanning = false;
-});
-canvas.addEventListener('mouseleave', () => {
-    isPanning = false;
-});
+canvas.addEventListener('mouseup', () => { isPanning = false; });
+canvas.addEventListener('mouseleave', () => { isPanning = false; });
 
-// Handle zooming via mouse wheel.
+// Zooming via mouse wheel.
 canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const zoomFactor = 1.1;
-    // Get mouse position relative to canvas.
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    
-    // Convert mouse coordinates to scene coordinates.
     const sceneX = (mouseX - canvas.width / 2 - panX) / scale;
     const sceneY = (mouseY - canvas.height / 2 - panY) / scale;
-    
-    // Adjust scale.
     if (e.deltaY < 0) {
         scale *= zoomFactor;
     } else {
         scale /= zoomFactor;
     }
-    
-    // Adjust pan to keep mouse position stable.
     panX = mouseX - canvas.width / 2 - sceneX * scale;
     panY = mouseY - canvas.height / 2 - sceneY * scale;
-    
     draw();
 });
 
-// --------- MAVLink & Position Updates --------- //
+// ------------------ MAVLink & Position Updates ------------------ //
 
 function handleLatitude() {
     const lat = window.cockpit.getDataLakeVariableData(VARS.lat) / 1e7;
     if (lat === undefined) return;
-    
     currentPosition.lat = lat;
     updatePosition();
 }
@@ -550,7 +527,6 @@ function handleLatitude() {
 function handleLongitude() {
     const lon = window.cockpit.getDataLakeVariableData(VARS.lon) / 1e7;
     if (lon === undefined) return;
-    
     currentPosition.lon = lon;
     updatePosition();
 }
@@ -558,28 +534,21 @@ function handleLongitude() {
 function handleHeading() {
     const heading = window.cockpit.getDataLakeVariableData(VARS.hdg) / 100;
     if (heading === undefined) return;
-    
     currentHeading = heading;
 }
 
 function updatePosition() {
     if (!currentPosition.lat || !currentPosition.lon) return;
-    
     const { lat, lon } = currentPosition;
-
-    if (!firstPoint) {
-        firstPoint = { lat, lon };
-    }
-
+    if (!firstPoint) { firstPoint = { lat, lon }; }
     if (trail.length === 0 || calculateLatLonDistance({ lat, lon }, trail[trail.length - 1]) >= MIN_DISTANCE) {
         trail.push({ lat, lon });
         if (trail.length > MAX_TRAIL_POINTS) trail.shift();
     }
-
     positionDisplay.innerText = `ROV: ${lat.toFixed(7)}°, ${lon.toFixed(7)}°`;
 }
 
-// --------- MAVLink Listeners --------- //
+// ------------------ MAVLink Listeners ------------------ //
 
 window.cockpit.listenDataLakeVariable(VARS.lat, handleLatitude);
 window.cockpit.listenDataLakeVariable(VARS.lon, handleLongitude);
@@ -588,10 +557,15 @@ window.cockpit.listenDataLakeVariable(VARS.hdg, handleHeading);
 // Initial draw
 setInterval(draw, 1000 / 4);
 
-document.getElementById('toggleTargetContainer').addEventListener('click', function () {
+document.getElementById('toggleTargetContainer').addEventListener('click', () => {
     const targetContainer = document.getElementById('targetContainer');
-
     targetContainer.style.display = (targetContainer.style.display === 'none') ? 'block' : 'none';
-
     resizeCanvas();
 });
+
+function clearTrail() {
+    trail = [];
+    draw();
+}
+
+document.getElementById('clearTrail').addEventListener('click', clearTrail);

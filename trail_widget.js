@@ -375,17 +375,114 @@ function drawTarget() {
     });
 }
 
+function getGridSpacing() {
+    const candidateSteps = [1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]; // in meters
+    const minPixelSpacing = 40; // minimum spacing in pixels
+    const effectiveScale = BASE_SCALE * scale;
+    for (let step of candidateSteps) {
+        if (step * effectiveScale >= minPixelSpacing) {
+            return step;
+        }
+    }
+    return candidateSteps[candidateSteps.length - 1];
+}
+
+function drawGrid() {
+    if (!firstPoint) return;
+    
+    const gridSpacing = getGridSpacing();
+    const effectiveMultiplier = BASE_SCALE * scale;
+    
+    // Inverse conversion: world coordinates (in meters relative to firstPoint)
+    // corresponding to the canvas edges.
+    const leftMeters = (0 - canvas.width / 2 - panX) / effectiveMultiplier;
+    const rightMeters = (canvas.width - canvas.width / 2 - panX) / effectiveMultiplier;
+    const topMeters = (0 - canvas.height / 2 - panY) / effectiveMultiplier;
+    const bottomMeters = (canvas.height - canvas.height / 2 - panY) / effectiveMultiplier;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(68, 68, 68, 0.5)";
+    ctx.lineWidth = 1;
+    
+    // Draw vertical grid lines.
+    const startX = Math.floor(leftMeters / gridSpacing) * gridSpacing;
+    const endX = Math.ceil(rightMeters / gridSpacing) * gridSpacing;
+    for (let x = startX; x <= endX; x += gridSpacing) {
+        const startPoint = worldToScreen({ x: x, y: topMeters });
+        const endPoint = worldToScreen({ x: x, y: bottomMeters });
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(endPoint.x, endPoint.y);
+    }
+    
+    // Draw horizontal grid lines.
+    const startY = Math.floor(topMeters / gridSpacing) * gridSpacing;
+    const endY = Math.ceil(bottomMeters / gridSpacing) * gridSpacing;
+    for (let y = startY; y <= endY; y += gridSpacing) {
+        const startPoint = worldToScreen({ x: leftMeters, y: y });
+        const endPoint = worldToScreen({ x: rightMeters, y: y });
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(endPoint.x, endPoint.y);
+    }
+    
+    ctx.stroke();
+}
+
+function drawScaleIndicator() {
+    // Get current grid spacing
+    const gridSpacing = getGridSpacing();
+    const effectiveMultiplier = BASE_SCALE * scale;
+    const lineWidth = gridSpacing * effectiveMultiplier;
+    const margin = 10;
+
+    ctx.save();
+    // Reset transformation so that the indicator is fixed to the canvas.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    
+    // Draw horizontal line in bottom left.
+    const x = margin;
+    const y = canvas.height - margin;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + lineWidth, y);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw vertical lines at both ends
+    ctx.beginPath();
+    ctx.moveTo(x, y - 5);
+    ctx.lineTo(x, y + 5);
+    ctx.moveTo(x + lineWidth, y - 5);
+    ctx.lineTo(x + lineWidth, y + 5);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw the grid spacing text above the line.
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.fillText(gridSpacing + " m", x + lineWidth / 2, y - 5);
+    
+    ctx.restore();
+}
+
 // Updated draw() without applying a global scale transform.
 // All pan & zoom are incorporated via worldToScreen().
 function draw() {
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Draw grid first
+    drawGrid();
+    
     drawTrailPath();
     drawTarget();
     drawROV();
     
     ctx.restore();
+
+    drawScaleIndicator();
 }
 
 // --------- User Interaction: Panning & Zooming --------- //

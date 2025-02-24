@@ -66,6 +66,16 @@ function metersToPixels(meters, scaleFactor = BASE_SCALE) {
     return meters * scaleFactor;
 }
 
+// New helper: converts world (meters) coordinates to screen coordinates,
+// applying pan and zoom for position only. Note that drawn icons will be
+// rendered using constant pixel sizes.
+function worldToScreen(meters) {
+    return {
+        x: canvas.width / 2 + panX + metersToPixels(meters.x) * scale,
+        y: canvas.height / 2 + panY + metersToPixels(meters.y) * scale
+    };
+}
+
 function calculateLatLonDistance(pos1, pos2) {
     const meters = latLonToMeters(pos1.lat, pos1.lon, pos2.lat, pos2.lon);
     return Math.sqrt(meters.x * meters.x + meters.y * meters.y);
@@ -254,7 +264,7 @@ function drawROVIcon(x, y, heading) {
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 30;
 
-    // Draw a single arrow shape
+    // Draw a single arrow shape with constant dimensions.
     ctx.beginPath();
     ctx.moveTo(0, -10); // Top vertex
     ctx.lineTo(10, 10); // Bottom right vertex
@@ -271,10 +281,7 @@ function drawROV() {
     if (!firstPoint || !currentPosition.lat || !currentPosition.lon) return;
 
     const meters = latLonToMeters(currentPosition.lat, currentPosition.lon, firstPoint.lat, firstPoint.lon);
-    const pixels = {
-        x: metersToPixels(meters.x),
-        y: metersToPixels(meters.y)
-    };
+    const pixels = worldToScreen(meters);
     drawROVIcon(pixels.x, pixels.y, currentHeading);
 }
 
@@ -283,7 +290,6 @@ function drawTrailPath() {
 
     ctx.strokeStyle = COLORS.trail;
     ctx.lineWidth = LINES.trail;
-
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 10;
 
@@ -291,10 +297,7 @@ function drawTrailPath() {
 
     trail.forEach((point, index) => {
         const meters = latLonToMeters(point.lat, point.lon, firstPoint.lat, firstPoint.lon);
-        const pixels = {
-            x: metersToPixels(meters.x),
-            y: metersToPixels(meters.y)
-        };
+        const pixels = worldToScreen(meters);
         if (index === 0) {
             ctx.moveTo(pixels.x, pixels.y);
         } else {
@@ -307,7 +310,7 @@ function drawTrailPath() {
 function drawTarget() {
     if (!firstPoint || !targets.length || !currentPosition.lat || !currentPosition.lon) return;
     
-    // Draw connecting lines between targets
+    // Draw connecting lines between targets.
     ctx.beginPath();
     ctx.strokeStyle = '#999999';
     ctx.lineWidth = LINES.targetLine;
@@ -317,17 +320,11 @@ function drawTarget() {
     targets.forEach((target, index) => {
         if (!target) return;
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
-        const targetPixels = {
-            x: metersToPixels(targetMeters.x),
-            y: metersToPixels(targetMeters.y)
-        };
+        const targetPixels = worldToScreen(targetMeters);
 
         if (index > 0 && targets[index - 1]) {
             const prevMeters = latLonToMeters(targets[index - 1].lat, targets[index - 1].lon, firstPoint.lat, firstPoint.lon);
-            const prevPixels = {
-                x: metersToPixels(prevMeters.x),
-                y: metersToPixels(prevMeters.y)
-            };
+            const prevPixels = worldToScreen(prevMeters);
             ctx.moveTo(prevPixels.x, prevPixels.y);
             ctx.lineTo(targetPixels.x, targetPixels.y);
         }
@@ -338,15 +335,9 @@ function drawTarget() {
     if (activeTargetIndex !== -1 && targets[activeTargetIndex]) {
         const target = targets[activeTargetIndex];
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
-        const targetPixels = {
-            x: metersToPixels(targetMeters.x),
-            y: metersToPixels(targetMeters.y)
-        };
+        const targetPixels = worldToScreen(targetMeters);
         const currentMeters = latLonToMeters(currentPosition.lat, currentPosition.lon, firstPoint.lat, firstPoint.lon);
-        const currentPixels = {
-            x: metersToPixels(currentMeters.x),
-            y: metersToPixels(currentMeters.y)
-        };
+        const currentPixels = worldToScreen(currentMeters);
         ctx.beginPath();
         ctx.setLineDash([5, 5]);
         ctx.moveTo(currentPixels.x, currentPixels.y);
@@ -360,7 +351,6 @@ function drawTarget() {
         const midX = (currentPixels.x + targetPixels.x) / 2;
         const midY = (currentPixels.y + targetPixels.y) / 2;
         const distanceMeters = calculateLatLonDistance(currentPosition, target);
-
         ctx.font = 'bold 16px sans-serif';
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
@@ -371,10 +361,7 @@ function drawTarget() {
     targets.forEach((target, index) => {
         if (!target) return;
         const targetMeters = latLonToMeters(target.lat, target.lon, firstPoint.lat, firstPoint.lon);
-        const targetPixels = {
-            x: metersToPixels(targetMeters.x),
-            y: metersToPixels(targetMeters.y)
-        };
+        const targetPixels = worldToScreen(targetMeters);
 
         ctx.beginPath();
         const size = 8;
@@ -388,14 +375,11 @@ function drawTarget() {
     });
 }
 
-// Updated draw() to include pan & zoom transforms.
+// Updated draw() without applying a global scale transform.
+// All pan & zoom are incorporated via worldToScreen().
 function draw() {
     ctx.save();
-    // Clear the entire canvas.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Translate to canvas center, add panning and scaling.
-    ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
-    ctx.scale(scale, scale);
     
     drawTrailPath();
     drawTarget();
@@ -442,7 +426,7 @@ canvas.addEventListener('wheel', (e) => {
     const sceneX = (mouseX - canvas.width / 2 - panX) / scale;
     const sceneY = (mouseY - canvas.height / 2 - panY) / scale;
     
-    // Adjust scale
+    // Adjust scale.
     if (e.deltaY < 0) {
         scale *= zoomFactor;
     } else {

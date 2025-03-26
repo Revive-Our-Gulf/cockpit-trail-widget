@@ -29,6 +29,24 @@ function resizeCanvas() {
     updateDisplay();
 }
 
+function drawROV() {
+    if (!ctx || !canvas) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const size = Math.min(canvas.width, canvas.height) * 0.1;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - size);
+    ctx.lineTo(centerX - size, centerY + size);
+    ctx.lineTo(centerX + size, centerY + size);
+    ctx.closePath();
+    ctx.fillStyle = 'white';
+    ctx.fill();
+}
+
 
 
 function formatValue(id, value) {
@@ -52,22 +70,7 @@ function scheduleUpdate() {
     }
 }
 
-function updateDisplay() {
-    const headingElement = document.getElementById('currentHeading');
-    if (headingElement) {
-        headingElement.innerText = formatValue(VARS.hdg, currentValues[VARS.hdg]);
-    }
-    
-    const latElement = document.getElementById('currentLat');
-    if (latElement) {
-        latElement.innerText = formatValue(VARS.lat, currentValues[VARS.lat]);
-    }
-    
-    const lonElement = document.getElementById('currentLon');
-    if (lonElement) {
-        lonElement.innerText = formatValue(VARS.lon, currentValues[VARS.lon]);
-    }
-    
+function updateText(){
     const posElement = document.getElementById('currentPos');
     if (posElement) {
         const lat = formatValue(VARS.lat, currentValues[VARS.lat]);
@@ -77,6 +80,13 @@ function updateDisplay() {
         const vy = formatValue(VARS.vy, currentValues[VARS.vy]);
         posElement.innerText = `Lat: ${lat} Lon: ${lon} Heading: ${hdg}, Vx: ${vx}, Vy: ${vy}`;
     }
+}
+
+
+
+function updateDisplay() {
+    updateText();
+    drawROV();
 }
 
 

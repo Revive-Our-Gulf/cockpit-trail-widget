@@ -50,7 +50,7 @@
 #pixelCurrentPos,
 #firstPos {
     font-family: var(--v-font-family);
-    font-size: 14px;
+    font-size: 20px;
     line-height: 1.5;
     margin: 4px 0;
 }
@@ -101,4 +101,29 @@
 
 #addedTargetsContainer{
     gap: 8px;
+}
+
+.canvas-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.map-canvas-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px solid var(--v-border-color);
+    border-radius: 4px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+    background: transparent;
+    overflow: hidden;
+    box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.2);
+}
+
+.map-canvas-layer:active {
+    cursor: grabbing;
 }

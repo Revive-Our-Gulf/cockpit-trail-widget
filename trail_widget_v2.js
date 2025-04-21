@@ -191,20 +191,20 @@ const ROVMap = (() => {
     },
 
     // Check if a target is within the visible area
-    isTargetVisible(target, padding = 20) {
+    isTargetVisible(target, padding = 50) {
       const pos = this.targetToScreen(target);
       if (!pos) return false;
     
-      // Apply scaling when checking visibility
       const scaledX = pos.x * state.scale;
       const scaledY = pos.y * state.scale;
       
-      return (
-        scaledX >= -padding - canvas.width/2 &&
-        scaledX <= canvas.width/2 + padding &&
-        scaledY >= -padding - canvas.height/2 &&
-        scaledY <= canvas.height/2 + padding
+      const diagonal = Math.sqrt(
+        Math.pow(canvas.width/2, 2) + 
+        Math.pow(canvas.height/2, 2)
       );
+      
+      const distance = Math.sqrt(scaledX * scaledX + scaledY * scaledY);
+      return distance < diagonal + padding;
     },
   };
 
@@ -807,62 +807,45 @@ const ROVMap = (() => {
     },
 
     _calculateLineEndpoints(start, end) {
-      let lineEndPoint = { x: end.x, y: end.y };
-      let textPosition = {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 10) {
+      return {
+        lineEndPoint: end,
+        textPosition: {
         x: (start.x + end.x) / 2,
-        y: (start.y + end.y) / 2,
+        y: (start.y + end.y) / 2
+        }
       };
-
-      const isTargetOffScreen =
-        end.x < 0 || end.x > canvas.width || end.y < 0 || end.y > canvas.height;
-
-      if (isTargetOffScreen) {
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-
-        const intersections = [];
-
-        if (dy < 0) {
-          const t = -start.y / dy;
-          const x = start.x + t * dx;
-          if (x >= 0 && x <= canvas.width) {
-            intersections.push({ x, y: 0, dist: t });
-          }
-        }
-
-        if (dy > 0) {
-          const t = (canvas.height - start.y) / dy;
-          const x = start.x + t * dx;
-          if (x >= 0 && x <= canvas.width) {
-            intersections.push({ x, y: canvas.height, dist: t });
-          }
-        }
-
-        if (dx < 0) {
-          const t = -start.x / dx;
-          const y = start.y + t * dy;
-          if (y >= 0 && y <= canvas.height) {
-            intersections.push({ x: 0, y, dist: t });
-          }
-        }
-
-        if (dx > 0) {
-          const t = (canvas.width - start.x) / dx;
-          const y = start.y + t * dy;
-          if (y >= 0 && y <= canvas.height) {
-            intersections.push({ x: canvas.width, y, dist: t });
-          }
-        }
-
-        if (intersections.length > 0) {
-          intersections.sort((a, b) => a.dist - b.dist);
-          lineEndPoint = { x: intersections[0].x, y: intersections[0].y };
-          textPosition = {
-            x: (start.x + lineEndPoint.x) / 2,
-            y: (start.y + lineEndPoint.y) / 2,
-          };
-        }
       }
+
+      const dirX = dx / distance;
+      const dirY = dy / distance;
+
+      const diagonal = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2;
+      const isTargetVisible = distance < diagonal;
+
+      let lineEndPoint;
+      if (isTargetVisible) {
+      lineEndPoint = { x: end.x, y: end.y };
+      } else {
+      const extendedDistance = diagonal * 1.5;
+      lineEndPoint = {
+        x: start.x + dirX * extendedDistance,
+        y: start.y + dirY * extendedDistance
+      };
+      }
+
+      const textDistance = isTargetVisible 
+      ? distance / 2 
+      : Math.min(distance / 2, diagonal / 2);
+
+      const textPosition = {
+      x: start.x + dirX * textDistance,
+      y: start.y + dirY * textDistance
+      };
 
       return { lineEndPoint, textPosition };
     },
@@ -917,33 +900,35 @@ const ROVMap = (() => {
 
     drawGrid() {
       if (!state.currentPosition.lat || !state.currentPosition.lon) return;
-
+    
       ctx.save();
-      // Apply the inverse rotation for the world
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate(-state.currentHeading * (Math.PI / 180));
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
-
+    
       const gridSpacing = helpers.getGridSpacing();
       const effectiveMultiplier = CONSTANTS.BASE_SCALE * state.scale;
-
-      // Calculate grid boundaries
-      const leftMeters = -(canvas.width / 2) / effectiveMultiplier;
-      const rightMeters = canvas.width / 2 / effectiveMultiplier;
-      const topMeters = -(canvas.height / 2) / effectiveMultiplier;
-      const bottomMeters = canvas.height / 2 / effectiveMultiplier;
-
+    
+      // Calculate grid boundaries with extra padding to avoid seeing edges during rotation
+      // Use the diagonal length of the canvas as the maximum extent
+      const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+      const extraPadding = diagonal / 2; // Extra padding to ensure grid covers rotated view
+    
+      const leftMeters = -(canvas.width / 2 + extraPadding) / effectiveMultiplier;
+      const rightMeters = (canvas.width / 2 + extraPadding) / effectiveMultiplier;
+      const topMeters = -(canvas.height / 2 + extraPadding) / effectiveMultiplier;
+      const bottomMeters = (canvas.height / 2 + extraPadding) / effectiveMultiplier;
+    
       // Apply grid offset from ROV movement
       const offsetX = state.gridOffset.x % gridSpacing;
       const offsetY = state.gridOffset.y % gridSpacing;
-
+    
       ctx.beginPath();
       ctx.strokeStyle = STYLES.COLORS.GRID;
       ctx.lineWidth = 1;
-
+    
       // Draw vertical grid lines
-      const startX =
-        Math.floor(leftMeters / gridSpacing) * gridSpacing - offsetX;
+      const startX = Math.floor(leftMeters / gridSpacing) * gridSpacing - offsetX;
       const endX = Math.ceil(rightMeters / gridSpacing) * gridSpacing - offsetX;
       for (let x = startX; x <= endX; x += gridSpacing) {
         const startPoint = helpers.worldToScreen({ x, y: topMeters });
@@ -951,19 +936,17 @@ const ROVMap = (() => {
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(endPoint.x, endPoint.y);
       }
-
+    
       // Draw horizontal grid lines
-      const startY =
-        Math.floor(topMeters / gridSpacing) * gridSpacing - offsetY;
-      const endY =
-        Math.ceil(bottomMeters / gridSpacing) * gridSpacing - offsetY;
+      const startY = Math.floor(topMeters / gridSpacing) * gridSpacing - offsetY;
+      const endY = Math.ceil(bottomMeters / gridSpacing) * gridSpacing - offsetY;
       for (let y = startY; y <= endY; y += gridSpacing) {
         const startPoint = helpers.worldToScreen({ x: leftMeters, y });
         const endPoint = helpers.worldToScreen({ x: rightMeters, y });
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(endPoint.x, endPoint.y);
       }
-
+    
       ctx.stroke();
       ctx.restore();
     },

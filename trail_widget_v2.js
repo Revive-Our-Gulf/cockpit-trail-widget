@@ -1,24 +1,20 @@
-// ROV Visualization Module
 const ROVMap = (() => {
-  // Canvas setup
   const canvas = document.getElementById("mapCanvas");
   const ctx = canvas.getContext("2d");
   const positionDisplay = document.getElementById("currentPos");
   const mapContainer = document.getElementById("mapContainer");
 
-  // Constants
   const CONSTANTS = {
-    MIN_DISTANCE: 0.5, // meters
+    MIN_DISTANCE: 0.5,
     MAX_TRAIL_POINTS: 100,
-    EARTH_RADIUS: 111320, // meters per degree at equator
-    BASE_SCALE: 20, // Base scale for metersToPixels
+    EARTH_RADIUS: 111320,
+    BASE_SCALE: 20,
     MIN_SCALE: 0.1,
-    MAX_SCALE: 20, // MAXSCALE /
-    TARGET_REACHED_THRESHOLD: 1.0, // meters
+    MAX_SCALE: 20,
+    TARGET_REACHED_THRESHOLD: 1.0,
     ROV_SIZE: 20,
   };
 
-  // Visual settings
   const STYLES = {
     COLORS: {
       ROV: "white",
@@ -37,43 +33,36 @@ const ROVMap = (() => {
     },
   };
 
-  // MAVLink variables
   const MAVLINK_VARS = {
     LAT: "GLOBAL_POSITION_INT/lat",
     LON: "GLOBAL_POSITION_INT/lon",
     HDG: "GLOBAL_POSITION_INT/hdg",
   };
 
-  // State
   let state = {
-    trail: [], // Store absolute lat/lon positions
+    trail: [],
     firstPoint: null,
     currentHeading: 0,
     currentPosition: { lat: null, lon: null },
-    targets: [], // Array to store multiple targets
-    activeTargetIndex: -1, // Currently selected target
+    targets: [],
+    activeTargetIndex: -1,
     scale: 1,
     gridOrigin: { lat: null, lon: null },
     gridOffset: { x: 0, y: 0 },
     lastPosition: { lat: null, lon: null },
   };
 
-  // UI state
   let uiState = {
     initialPinchDistance: 0,
     lastScale: 1,
   };
 
-  // Helper Functions
   const helpers = {
-    // Resize canvas to fit container
     resizeCanvas() {
       canvas.width = mapContainer.clientWidth;
       canvas.height = mapContainer.clientHeight;
       render.draw();
     },
-
-    // Convert lat/lon to meters from reference point
     latLonToMeters(lat, lon, refLat, refLon) {
       const latMeters = (lat - refLat) * CONSTANTS.EARTH_RADIUS;
       const lonMeters =
@@ -82,21 +71,15 @@ const ROVMap = (() => {
         Math.cos((refLat * Math.PI) / 180);
       return { x: lonMeters, y: -latMeters };
     },
-
-    // Convert meters to pixels with scale
     metersToPixels(meters, scaleFactor = CONSTANTS.BASE_SCALE) {
       return meters * scaleFactor;
     },
-
-    // Convert world coordinates to screen coordinates
     worldToScreen(meters) {
       return {
         x: canvas.width / 2 + helpers.metersToPixels(meters.x) * state.scale,
         y: canvas.height / 2 + helpers.metersToPixels(meters.y) * state.scale,
       };
     },
-
-    // Calculate distance between two lat/lon positions
     calculateLatLonDistance(pos1, pos2) {
       const meters = helpers.latLonToMeters(
         pos1.lat,
@@ -106,13 +89,11 @@ const ROVMap = (() => {
       );
       return Math.sqrt(meters.x * meters.x + meters.y * meters.y);
     },
-
-    // Calculate grid spacing based on current zoom level
     getGridSpacing() {
       const candidateSteps = [
         1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-      ]; // in meters
-      const minPixelSpacing = 60; // minimum spacing in pixels
+      ];
+      const minPixelSpacing = 60;
       const effectiveScale = CONSTANTS.BASE_SCALE * state.scale;
 
       for (let step of candidateSteps) {
@@ -122,8 +103,6 @@ const ROVMap = (() => {
       }
       return candidateSteps[candidateSteps.length - 1];
     },
-
-    // Set a cookie with name, value and expiration days
     setCookie(name, value, days) {
       const d = new Date();
       d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
@@ -131,8 +110,6 @@ const ROVMap = (() => {
       document.cookie =
         name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
     },
-
-    // Get cookie value by name
     getCookie(name) {
       const cname = name + "=";
       const decodedCookie = decodeURIComponent(document.cookie);
@@ -147,35 +124,91 @@ const ROVMap = (() => {
       }
       return "";
     },
-
     drawLine(ctx, startX, startY, endX, endY, style = {}) {
-      // Save current context state
       ctx.save();
-
-      // Apply styles
       ctx.strokeStyle = style.color || STYLES.COLORS.TRAIL;
       ctx.lineWidth = style.width || STYLES.LINES.TRAIL;
-
-      // Apply shadow if specified
       if (style.shadow) {
         ctx.shadowColor = style.shadowColor || "rgba(0, 0, 0, 0.5)";
         ctx.shadowBlur = style.shadowBlur || 10;
       }
-
-      // Draw the line
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
       ctx.stroke();
-
-      // Restore context to previous state
       ctx.restore();
     },
   };
 
-  // Target Management Module
+  const geoUtils = {
+    latLonToScreen(lat, lon, referencePoint = null) {
+      const ref = state.currentPosition;
+      if (!ref || !ref.lat) return null;
+
+      const latMeters = (lat - ref.lat) * CONSTANTS.EARTH_RADIUS;
+      const lonMeters =
+        (lon - ref.lon) *
+        CONSTANTS.EARTH_RADIUS *
+        Math.cos((ref.lat * Math.PI) / 180);
+
+      return {
+        x: lonMeters * CONSTANTS.BASE_SCALE,
+        y: -latMeters * CONSTANTS.BASE_SCALE,
+      };
+    },
+
+    // Convert a target object directly to screen coordinates
+    targetToScreen(target) {
+      if (!target || !target.lat || !target.lon) return null;
+      return this.latLonToScreen(target.lat, target.lon);
+    },
+
+    // Calculate distance between two lat/lon positions directly
+    getDistance(pos1, pos2) {
+      if (!pos1 || !pos2) return 0;
+
+      const latDiff = (pos1.lat - pos2.lat) * CONSTANTS.EARTH_RADIUS;
+      const lonDiff =
+        (pos1.lon - pos2.lon) *
+        CONSTANTS.EARTH_RADIUS *
+        Math.cos(((pos1.lat + pos2.lat) / 2) * (Math.PI / 180));
+
+      return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
+    },
+
+    // Get bearing between two points (returns degrees from north)
+    getBearing(from, to) {
+      const dLon = (to.lon - from.lon) * (Math.PI / 180);
+      const y = Math.sin(dLon) * Math.cos(to.lat * (Math.PI / 180));
+      const x =
+        Math.cos(from.lat * (Math.PI / 180)) *
+          Math.sin(to.lat * (Math.PI / 180)) -
+        Math.sin(from.lat * (Math.PI / 180)) *
+          Math.cos(to.lat * (Math.PI / 180)) *
+          Math.cos(dLon);
+      const bearing = Math.atan2(y, x) * (180 / Math.PI);
+      return (bearing + 360) % 360;
+    },
+
+    // Check if a target is within the visible area
+    isTargetVisible(target, padding = 20) {
+      const pos = this.targetToScreen(target);
+      if (!pos) return false;
+    
+      // Apply scaling when checking visibility
+      const scaledX = pos.x * state.scale;
+      const scaledY = pos.y * state.scale;
+      
+      return (
+        scaledX >= -padding - canvas.width/2 &&
+        scaledX <= canvas.width/2 + padding &&
+        scaledY >= -padding - canvas.height/2 &&
+        scaledY <= canvas.height/2 + padding
+      );
+    },
+  };
+
   const targets = {
-    // Save targets to cookie
     saveTargets() {
       helpers.setCookie(
         "cockpit-trail-widget-targets",
@@ -183,14 +216,11 @@ const ROVMap = (() => {
         365
       );
     },
-
-    // Load targets from cookie
     loadTargets() {
       const cookieVal = helpers.getCookie("cockpit-trail-widget-targets");
       if (cookieVal) {
         try {
           state.targets = JSON.parse(cookieVal);
-          // If there are any targets, automatically select the first target
           if (state.targets && state.targets.length > 0) {
             state.activeTargetIndex = 0;
             const container = document.getElementById("addedTargetsContainer");
@@ -204,7 +234,6 @@ const ROVMap = (() => {
         }
       }
     },
-
     createTargetEntry(index) {
       const inputGroup = document.createElement("div");
       inputGroup.className = "target-input-group";
@@ -243,11 +272,9 @@ const ROVMap = (() => {
       </div>
     `;
 
-      // Set initial target coordinates in the input field
       const targetInput = inputGroup.querySelector(".targetCoords");
       targetInput.value = `${state.targets[index].lat}, ${state.targets[index].lon}`;
 
-      // Allow user to update target on Enter key press
       targetInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
           const value = targetInput.value;
@@ -262,7 +289,6 @@ const ROVMap = (() => {
             console.log("Invalid coordinates");
             return;
           }
-          // Update the underlying targets array
           state.targets[index] = { lat, lon };
           targetInput.value = `${lat}, ${lon}`;
           render.draw();
@@ -272,13 +298,10 @@ const ROVMap = (() => {
 
       document.getElementById("addedTargetsContainer").appendChild(inputGroup);
       targets.setupTargetEntryListeners(inputGroup, index);
-
-      // Apply drag functionality to this element immediately after creation
       targets.setupDragForElement(inputGroup);
     },
 
     setupDragAndDrop() {
-      // We'll use a mutation observer to detect when new target entries are added
       const targetContainer = document.getElementById("addedTargetsContainer");
 
       const observer = new MutationObserver((mutations) => {
@@ -299,7 +322,6 @@ const ROVMap = (() => {
       observer.observe(targetContainer, { childList: true });
     },
 
-    // Set up drag for a specific target element
     setupDragForElement(element) {
       const dragHandle = element.querySelector(".drag-handle");
       if (!dragHandle) return;
@@ -310,17 +332,14 @@ const ROVMap = (() => {
       let startY = 0;
       let startIndex = 0;
 
-      // Use a named function for the event handler so we can remove it properly
       const handleMouseMove = (e) => {
         if (!draggedElement) return;
 
         const container = document.getElementById("addedTargetsContainer");
         const children = Array.from(container.children);
 
-        // Calculate position
         const currentY = e.clientY;
 
-        // Find the target element to swap with
         const targetElements = children.filter((el) => el !== draggedElement);
         let swapWith = null;
 
@@ -335,21 +354,17 @@ const ROVMap = (() => {
           }
         });
 
-        // Perform the swap if needed
         if (swapWith) {
           const newIndex = parseInt(swapWith.dataset.index);
 
-          // Update the targets array
           [state.targets[startIndex], state.targets[newIndex]] = [
             state.targets[newIndex],
             state.targets[startIndex],
           ];
 
-          // Update the DOM by reinitializing targets
           targets.compactTargets();
           targets.saveTargets();
 
-          // Update the current dragged element reference and start position
           draggedElement = document.querySelector(
             `.target-input-group[data-index="${newIndex}"]`
           );
@@ -366,18 +381,15 @@ const ROVMap = (() => {
         draggedElement = null;
         document.body.style.cursor = "";
 
-        // Remove listeners
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
 
         render.draw();
       };
 
-      // Clear any existing event listeners before adding new ones
       const newDragHandle = dragHandle.cloneNode(true);
       dragHandle.parentNode.replaceChild(newDragHandle, dragHandle);
 
-      // Add mousedown event to the new drag handle
       newDragHandle.addEventListener("mousedown", (e) => {
         draggedElement = element;
         startY = e.clientY;
@@ -385,18 +397,15 @@ const ROVMap = (() => {
 
         document.body.style.cursor = "grabbing";
 
-        // Add dragging class for styling
         element.classList.add("target-dragging");
 
-        // Listen for mouse movements
         document.addEventListener("mousemove", handleMouseMove);
         document.addEventListener("mouseup", handleMouseUp);
 
-        e.preventDefault(); // Prevent text selection
+        e.preventDefault();
       });
     },
 
-    // Set up event listeners for target entries
     setupTargetEntryListeners(inputGroup, index) {
       const selectBtn = inputGroup.querySelector(".select-target");
       const removeBtn = inputGroup.querySelector(".remove-target");
@@ -414,7 +423,6 @@ const ROVMap = (() => {
       });
     },
 
-    // Clean up targets list and rebuild UI
     compactTargets() {
       state.targets = state.targets.filter((target) => target !== null);
 
@@ -438,7 +446,6 @@ const ROVMap = (() => {
       }
     },
 
-    // Set up the new target input field
     setupNewTargetInput() {
       const newTargetGroup = document.getElementById("newTargetInput");
       const input = newTargetGroup.querySelector(".newTargetCoords");
@@ -478,49 +485,40 @@ const ROVMap = (() => {
     addDragStyles() {
       const style = document.createElement("style");
       style.textContent = `
-        .target-dragging {
-          opacity: 0.8;
-          background-color: rgba(0, 0, 0, 0.1);
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-          position: relative;
-          z-index: 1000;
-          transition: transform 0.1s;
-        }
-        .drag-handle {
-          cursor: grab;
-        }
-        .drag-handle:active {
-          cursor: grabbing;
-        }
+      .target-dragging {
+        opacity: 0.8;
+        background-color: rgba(0, 0, 0, 0.1);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        position: relative;
+        z-index: 1000;
+        transition: transform 0.1s;
+      }
+      .drag-handle {
+        cursor: grab;
+      }
+      .drag-handle:active {
+        cursor: grabbing;
+      }
       `;
       document.head.appendChild(style);
     },
   };
 
-  // Rendering Module
   const render = {
-    // Main drawing function
     draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       this.drawGrid();
       this.drawTrailPath();
       this.drawTargets();
       this.drawROV();
-
       this.drawScaleIndicator();
     },
 
-    // Draw the ROV icon
     drawROV() {
-      // Always draw the ROV at the center of the canvas pointing up
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
-
       ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
       ctx.shadowBlur = 30;
-
-      // Draw arrow shape
       ctx.beginPath();
       ctx.moveTo(0, -CONSTANTS.ROV_SIZE);
       ctx.lineTo(CONSTANTS.ROV_SIZE, CONSTANTS.ROV_SIZE);
@@ -529,22 +527,14 @@ const ROVMap = (() => {
       ctx.closePath();
       ctx.fillStyle = STYLES.COLORS.ROV;
       ctx.fill();
-
-      // Draw direction line
       helpers.drawLine(ctx, 0, -10, 0, -60, {
         color: "grey",
         width: 3,
       });
-
-      // Improved North indicator
       const northAngle = -state.currentHeading * (Math.PI / 180);
       const northLength = 55;
-
-      // Draw North line with arrow
       const northX = Math.sin(northAngle) * northLength;
       const northY = -Math.cos(northAngle) * northLength;
-
-      // Main north line
       helpers.drawLine(ctx, 0, 0, northX, northY, {
         color: STYLES.COLORS.NORTH,
         width: 3.5,
@@ -552,54 +542,31 @@ const ROVMap = (() => {
         shadowColor: "rgba(255, 0, 0, 0.4)",
         shadowBlur: 8,
       });
-
-      // Add correctly oriented arrowhead to north line
       const arrowLength = 10;
       const arrowWidth = 12;
-
-      // Calculate arrow points
       ctx.beginPath();
       ctx.fillStyle = STYLES.COLORS.NORTH;
-
-      // Arrow tip is at the end of the north line
       ctx.moveTo(northX, northY);
-
-      // Calculate the base points of the arrowhead
-      // We need to go back along the line by arrowLength
       const baseX = northX - Math.sin(northAngle) * arrowLength;
       const baseY = northY + Math.cos(northAngle) * arrowLength;
-
-      // Then offset perpendicular to the line by +/- arrowWidth/2
       const perpAngle = northAngle + Math.PI / 2;
       const offsetX = (Math.sin(perpAngle) * arrowWidth) / 2;
       const offsetY = (-Math.cos(perpAngle) * arrowWidth) / 2;
-
-      // Draw the two base points of the arrow
       ctx.lineTo(baseX + offsetX, baseY + offsetY);
       ctx.lineTo(baseX - offsetX, baseY - offsetY);
-
-      // Complete the triangle
       ctx.closePath();
       ctx.fill();
-
-      // Add N letter at the end of the line (properly centered)
       ctx.fillStyle = STYLES.COLORS.NORTH;
       ctx.font = "bold 16px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
-      // Calculate position for the N label
-      // We want it slightly beyond the arrowhead
-      const labelDistance = northLength + 10; // 10px beyond arrow tip
+      const labelDistance = northLength + 10;
       const labelX = Math.sin(northAngle) * labelDistance;
       const labelY = -Math.cos(northAngle) * labelDistance;
-
       ctx.fillText("N", labelX, labelY);
-
       ctx.restore();
     },
 
-    // Draw the trail behind the ROV
     drawTrailPath() {
       if (
         !state.currentPosition.lat ||
@@ -607,42 +574,31 @@ const ROVMap = (() => {
         state.trail.length < 2
       )
         return;
-
       ctx.save();
-      // Apply the inverse rotation for the world
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate(-state.currentHeading * (Math.PI / 180));
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
-
-      // Draw the trail as connected segments
       for (let i = 1; i < state.trail.length; i++) {
         const prevPoint = state.trail[i - 1];
         const currentPoint = state.trail[i];
-
-        const prevPixels = helpers.metersToPixels(
-          helpers.latLonToMeters(
-            prevPoint.lat,
-            prevPoint.lon,
-            state.currentPosition.lat,
-            state.currentPosition.lon
-          )
+        const prevPixels = geoUtils.latLonToScreen(
+          prevPoint.lat,
+          prevPoint.lon,
+          state.currentPosition
         );
-
-        const currentPixels = helpers.metersToPixels(
-          helpers.latLonToMeters(
-            currentPoint.lat,
-            currentPoint.lon,
-            state.currentPosition.lat,
-            state.currentPosition.lon
-          )
+        const currentPixels = geoUtils.latLonToScreen(
+          currentPoint.lat,
+          currentPoint.lon,
+          state.currentPosition
         );
-
+        
+        // Apply scaling consistently
         helpers.drawLine(
           ctx,
-          canvas.width / 2 + prevPixels.x,
-          canvas.height / 2 + prevPixels.y,
-          canvas.width / 2 + currentPixels.x,
-          canvas.height / 2 + currentPixels.y,
+          canvas.width / 2 + prevPixels.x * state.scale,
+          canvas.height / 2 + prevPixels.y * state.scale,
+          canvas.width / 2 + currentPixels.x * state.scale,
+          canvas.height / 2 + currentPixels.y * state.scale,
           {
             color: STYLES.COLORS.TRAIL,
             width: STYLES.LINES.TRAIL,
@@ -650,11 +606,9 @@ const ROVMap = (() => {
           }
         );
       }
-
       ctx.restore();
     },
 
-    // Draw targets and their connections
     drawTargets() {
       if (
         !state.firstPoint ||
@@ -664,46 +618,39 @@ const ROVMap = (() => {
       )
         return;
 
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(-state.currentHeading * (Math.PI / 180));
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
       this._drawTargetConnections();
       this._drawActiveTargetLine();
       this._drawPreviousTargetLine();
       this._drawTargetMarkers();
+
+      ctx.restore();
     },
 
-    // Add this to the render object
     _drawLineWithTextGap(start, end, textPosition, style = {}) {
-      // Calculate vector from start to end
       const dx = end.x - start.x;
       const dy = end.y - start.y;
-
-      // Calculate distance to text position along the line
       const textDist = Math.sqrt(
         Math.pow(textPosition.x - start.x, 2) +
           Math.pow(textPosition.y - start.y, 2)
       );
-
-      // Calculate total line length
       const totalDist = Math.sqrt(dx * dx + dy * dy);
-
-      // Calculate normalized direction vector
       const dirX = dx / totalDist;
       const dirY = dy / totalDist;
-
-      // Define gap size around text (adjust as needed)
-      const gapSize = 25; // pixels on each side of text position
-
-      // Calculate gap start and end positions
+      const gapSize = 25;
       const gapStart = {
         x: textPosition.x - gapSize * dirX,
         y: textPosition.y - gapSize * dirY,
       };
-
       const gapEnd = {
         x: textPosition.x + gapSize * dirX,
         y: textPosition.y + gapSize * dirY,
       };
 
-      // Set up style for drawing
       ctx.beginPath();
       if (style.dashed) {
         ctx.setLineDash(style.dashed);
@@ -713,52 +660,44 @@ const ROVMap = (() => {
       ctx.strokeStyle = style.color || STYLES.COLORS.DISTANCE_LINE_PRIMARY;
       ctx.lineWidth = style.width || STYLES.LINES.TARGET_LINE;
 
-      // Draw first segment (start to gap)
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(gapStart.x, gapStart.y);
       ctx.stroke();
 
-      // Draw second segment (gap to end)
       ctx.beginPath();
       ctx.moveTo(gapEnd.x, gapEnd.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
 
-      // Reset dash setting
       ctx.setLineDash([]);
     },
 
-    // Draw lines connecting consecutive targets
     _drawTargetConnections() {
       ctx.beginPath();
       ctx.strokeStyle = "#999999";
       ctx.lineWidth = STYLES.LINES.TARGET_LINE;
-
+    
       state.targets.forEach((target, index) => {
         if (!target) return;
-        const targetMeters = helpers.latLonToMeters(
-          target.lat,
-          target.lon,
-          state.firstPoint.lat,
-          state.firstPoint.lon
-        );
-        const targetPixels = helpers.worldToScreen(targetMeters);
-
+        const targetPixels = geoUtils.targetToScreen(target);
+        if (!targetPixels) return;
+        
+        // Apply scaling to get correct screen coordinates
+        const screenX = canvas.width / 2 + targetPixels.x * state.scale;
+        const screenY = canvas.height / 2 + targetPixels.y * state.scale;
+    
         if (index > 0 && state.targets[index - 1]) {
-          const prevMeters = helpers.latLonToMeters(
-            state.targets[index - 1].lat,
-            state.targets[index - 1].lon,
-            state.firstPoint.lat,
-            state.firstPoint.lon
-          );
-          const prevPixels = helpers.worldToScreen(prevMeters);
-
+          const prevPixels = geoUtils.targetToScreen(state.targets[index - 1]);
+          if (!prevPixels) return;
+          
+          // Apply scaling to previous target as well
+          const prevScreenX = canvas.width / 2 + prevPixels.x * state.scale;
+          const prevScreenY = canvas.height / 2 + prevPixels.y * state.scale;
+    
           helpers.drawLine(
             ctx,
-            prevPixels.x,
-            prevPixels.y,
-            targetPixels.x,
-            targetPixels.y,
+            prevScreenX, prevScreenY,
+            screenX, screenY,
             {
               color: STYLES.COLORS.TARGET_LINE,
               width: STYLES.LINES.TARGET_LINE,
@@ -774,38 +713,38 @@ const ROVMap = (() => {
         !state.targets[state.activeTargetIndex]
       )
         return;
-
+    
       const target = state.targets[state.activeTargetIndex];
-      const targetMeters = helpers.latLonToMeters(
-        target.lat,
-        target.lon,
-        state.firstPoint.lat,
-        state.firstPoint.lon
-      );
-      const targetPixels = helpers.worldToScreen(targetMeters);
-
+      const targetPixels = geoUtils.targetToScreen(target);
+      if (!targetPixels) return;
+    
+      // Apply proper scaling
+      const scaledTarget = {
+        x: canvas.width / 2 + targetPixels.x * state.scale,
+        y: canvas.height / 2 + targetPixels.y * state.scale
+      };
+    
       const currentPixels = {
         x: canvas.width / 2,
         y: canvas.height / 2,
       };
-
+    
       const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
         currentPixels,
-        targetPixels
+        scaledTarget
       );
-
-      // Draw line with gap for text
+    
       this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
         color: STYLES.COLORS.DISTANCE_LINE_PRIMARY,
         width: STYLES.LINES.TARGET_LINE,
         dashed: [5, 5],
       });
-
-      // Display distance
-      const distanceMeters = helpers.calculateLatLonDistance(
+    
+      const distanceMeters = geoUtils.getDistance(
         state.currentPosition,
         target
       );
+    
       this._drawDistanceLabel(
         textPosition,
         distanceMeters,
@@ -814,7 +753,6 @@ const ROVMap = (() => {
     },
 
     _drawPreviousTargetLine() {
-      // Check if we have targets and a current position
       if (
         !state.targets.length ||
         !state.currentPosition.lat ||
@@ -823,47 +761,44 @@ const ROVMap = (() => {
       ) {
         return;
       }
-
-      // Get index of previous target (wrap around to end of array if at first target)
+    
       const prevIndex =
         (state.activeTargetIndex - 1 + state.targets.length) %
         state.targets.length;
-
-      // Skip if there's only one target
+    
       if (prevIndex === state.activeTargetIndex) return;
-
+    
       const prevTarget = state.targets[prevIndex];
-      const targetMeters = helpers.latLonToMeters(
-        prevTarget.lat,
-        prevTarget.lon,
-        state.firstPoint.lat,
-        state.firstPoint.lon
-      );
-      const targetPixels = helpers.worldToScreen(targetMeters);
-
+      const targetPixels = geoUtils.targetToScreen(prevTarget);
+      if (!targetPixels) return;
+    
+      // Apply proper scaling
+      const scaledTarget = {
+        x: canvas.width / 2 + targetPixels.x * state.scale,
+        y: canvas.height / 2 + targetPixels.y * state.scale
+      };
+    
       const currentPixels = {
         x: canvas.width / 2,
         y: canvas.height / 2,
       };
-
+    
       const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
         currentPixels,
-        targetPixels
+        scaledTarget
       );
-
-      // Draw line with gap for text
+    
       this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
         color: STYLES.COLORS.DISTANCE_LINE_SECONDARY,
         width: STYLES.LINES.TARGET_LINE,
         dashed: [5, 5],
       });
-
-      // Calculate and display distance
+    
       const distanceMeters = helpers.calculateLatLonDistance(
         state.currentPosition,
         prevTarget
       );
-
+    
       this._drawDistanceLabel(
         textPosition,
         distanceMeters,
@@ -871,7 +806,6 @@ const ROVMap = (() => {
       );
     },
 
-    // Calculate line endpoints for target lines
     _calculateLineEndpoints(start, end) {
       let lineEndPoint = { x: end.x, y: end.y };
       let textPosition = {
@@ -879,18 +813,15 @@ const ROVMap = (() => {
         y: (start.y + end.y) / 2,
       };
 
-      // Check if target is outside canvas
       const isTargetOffScreen =
         end.x < 0 || end.x > canvas.width || end.y < 0 || end.y > canvas.height;
 
       if (isTargetOffScreen) {
-        // Calculate direction vector
         const dx = end.x - start.x;
         const dy = end.y - start.y;
 
         const intersections = [];
 
-        // Check top edge (y = 0)
         if (dy < 0) {
           const t = -start.y / dy;
           const x = start.x + t * dx;
@@ -899,7 +830,6 @@ const ROVMap = (() => {
           }
         }
 
-        // Check bottom edge (y = canvas.height)
         if (dy > 0) {
           const t = (canvas.height - start.y) / dy;
           const x = start.x + t * dx;
@@ -908,7 +838,6 @@ const ROVMap = (() => {
           }
         }
 
-        // Check left edge (x = 0)
         if (dx < 0) {
           const t = -start.x / dx;
           const y = start.y + t * dy;
@@ -917,7 +846,6 @@ const ROVMap = (() => {
           }
         }
 
-        // Check right edge (x = canvas.width)
         if (dx > 0) {
           const t = (canvas.width - start.x) / dx;
           const y = start.y + t * dy;
@@ -926,7 +854,6 @@ const ROVMap = (() => {
           }
         }
 
-        // Find closest intersection
         if (intersections.length > 0) {
           intersections.sort((a, b) => a.dist - b.dist);
           lineEndPoint = { x: intersections[0].x, y: intersections[0].y };
@@ -940,7 +867,6 @@ const ROVMap = (() => {
       return { lineEndPoint, textPosition };
     },
 
-    // Draw distance label with background
     _drawDistanceLabel(position, distanceMeters, textColour) {
       const distanceText = distanceMeters.toFixed(0) + " m";
 
@@ -948,62 +874,47 @@ const ROVMap = (() => {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Draw text
       ctx.fillStyle = textColour;
       ctx.fillText(distanceText, position.x, position.y);
     },
 
-    // Draw target X markers
     _drawTargetMarkers() {
       state.targets.forEach((target, index) => {
         if (!target) return;
-        const targetMeters = helpers.latLonToMeters(
-          target.lat,
-          target.lon,
-          state.firstPoint.lat,
-          state.firstPoint.lon
-        );
-        const targetPixels = helpers.worldToScreen(targetMeters);
 
-        // Only draw visible targets
-        if (
-          targetPixels.x >= -20 &&
-          targetPixels.x <= canvas.width + 20 &&
-          targetPixels.y >= -20 &&
-          targetPixels.y <= canvas.height + 20
-        ) {
+        const targetPixels = geoUtils.targetToScreen(target);
+        if (!targetPixels) return;
+
+        const screenX = canvas.width / 2 + targetPixels.x * state.scale;
+        const screenY = canvas.height / 2 + targetPixels.y * state.scale;
+
+        if (geoUtils.isTargetVisible(target)) {
           const size = 12;
           const color =
             index === state.activeTargetIndex
               ? STYLES.COLORS.TARGET
               : "#999999";
+
           helpers.drawLine(
             ctx,
-            targetPixels.x - size,
-            targetPixels.y - size,
-            targetPixels.x + size,
-            targetPixels.y + size,
-            {
-              color: color,
-              width: STYLES.LINES.TARGET,
-            }
+            screenX - size,
+            screenY - size,
+            screenX + size,
+            screenY + size,
+            { color: color, width: STYLES.LINES.TARGET }
           );
           helpers.drawLine(
             ctx,
-            targetPixels.x + size,
-            targetPixels.y - size,
-            targetPixels.x - size,
-            targetPixels.y + size,
-            {
-              color: color,
-              width: STYLES.LINES.TARGET,
-            }
+            screenX + size,
+            screenY - size,
+            screenX - size,
+            screenY + size,
+            { color: color, width: STYLES.LINES.TARGET }
           );
         }
       });
     },
 
-    // Draw grid lines
     drawGrid() {
       if (!state.currentPosition.lat || !state.currentPosition.lon) return;
 
@@ -1057,7 +968,6 @@ const ROVMap = (() => {
       ctx.restore();
     },
 
-    // Draw scale indicator
     drawScaleIndicator() {
       const gridSpacing = helpers.getGridSpacing();
       const formattedValue =
@@ -1065,16 +975,13 @@ const ROVMap = (() => {
           ? (gridSpacing / 1000).toFixed(1) + " km"
           : gridSpacing.toFixed(0) + " m";
 
-      // Position in bottom left corner with padding
       const padding = 20;
       const x = padding;
       const y = canvas.height - padding;
 
-      // Draw text
       ctx.save();
       ctx.font = "bold 20px Arial";
 
-      // Use the same color as the grid
       ctx.fillStyle = "white";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -1083,9 +990,7 @@ const ROVMap = (() => {
     },
   };
 
-  // MAVLink Data Handling Module
   const mavlink = {
-    // Handle latitude updates
     handleLatitude() {
       const lat =
         window.cockpit.getDataLakeVariableData(MAVLINK_VARS.LAT) / 1e7;
@@ -1095,7 +1000,6 @@ const ROVMap = (() => {
       mavlink.updatePosition();
     },
 
-    // Handle longitude updates
     handleLongitude() {
       const lon =
         window.cockpit.getDataLakeVariableData(MAVLINK_VARS.LON) / 1e7;
@@ -1105,7 +1009,6 @@ const ROVMap = (() => {
       mavlink.updatePosition();
     },
 
-    // Handle heading updates
     handleHeading() {
       const heading =
         window.cockpit.getDataLakeVariableData(MAVLINK_VARS.HDG) / 100;
@@ -1115,19 +1018,16 @@ const ROVMap = (() => {
       render.draw();
     },
 
-    // Update position and trail
     updatePosition() {
       if (!state.currentPosition.lat || !state.currentPosition.lon) return;
 
       const { lat, lon } = state.currentPosition;
 
-      // Initialize grid origin if not set
       if (!state.gridOrigin.lat) {
         state.gridOrigin.lat = lat;
         state.gridOrigin.lon = lon;
       }
 
-      // Update grid offset based on ROV movement
       if (state.lastPosition.lat !== null) {
         const movement = helpers.latLonToMeters(
           lat,
@@ -1139,19 +1039,16 @@ const ROVMap = (() => {
         state.gridOffset.y += movement.y;
       }
 
-      // Update reference position
       state.lastPosition.lat = lat;
       state.lastPosition.lon = lon;
 
-      // Initialize first point if needed
       if (!state.firstPoint) {
         state.firstPoint = { lat, lon };
       }
 
-      // Add to trail if minimum distance is met
       if (
         state.trail.length === 0 ||
-        helpers.calculateLatLonDistance(
+        geoUtils.getDistance(
           { lat, lon },
           state.trail[state.trail.length - 1]
         ) >= CONSTANTS.MIN_DISTANCE
@@ -1161,17 +1058,14 @@ const ROVMap = (() => {
           state.trail.shift();
       }
 
-      // Update position display
       positionDisplay.innerText = `ROV: ${lat.toFixed(7)}°, ${lon.toFixed(7)}°`;
 
-      // Check if we've reached the current target
       this.checkTargetProximity();
 
       render.draw();
     },
 
     checkTargetProximity() {
-      // Only check if we have an active target and position data
       if (
         state.activeTargetIndex === -1 ||
         !state.targets.length ||
@@ -1182,12 +1076,11 @@ const ROVMap = (() => {
       }
 
       const currentTarget = state.targets[state.activeTargetIndex];
-      const distanceToTarget = helpers.calculateLatLonDistance(
+      const distanceToTarget = geoUtils.getDistance(
         state.currentPosition,
         currentTarget
       );
 
-      // If within threshold distance, move to next target
       if (distanceToTarget <= CONSTANTS.TARGET_REACHED_THRESHOLD) {
         console.log(
           `Target ${
@@ -1195,7 +1088,6 @@ const ROVMap = (() => {
           } reached! Distance: ${distanceToTarget.toFixed(2)}m`
         );
 
-        // Go to next target, loop back to beginning if at end
         state.activeTargetIndex =
           (state.activeTargetIndex + 1) % state.targets.length;
         console.log(`Moving to target ${state.activeTargetIndex + 1}`);
@@ -1204,7 +1096,6 @@ const ROVMap = (() => {
       }
     },
 
-    // Set up mavlink listeners
     setupListeners() {
       window.cockpit.listenDataLakeVariable(
         MAVLINK_VARS.LAT,
@@ -1221,21 +1112,17 @@ const ROVMap = (() => {
     },
   };
 
-  // UI Event Handlers
   const events = {
-    // Handle wheel events for zooming
     handleWheel(e) {
       e.preventDefault();
       const zoomFactor = 1.1;
 
-      // Adjust scale
       if (e.deltaY < 0) {
         state.scale *= zoomFactor;
       } else {
         state.scale /= zoomFactor;
       }
 
-      // Apply scale limits
       state.scale = Math.max(
         CONSTANTS.MIN_SCALE,
         Math.min(state.scale, CONSTANTS.MAX_SCALE)
@@ -1243,10 +1130,8 @@ const ROVMap = (() => {
       render.draw();
     },
 
-    // Handle touch start for pinch zooming
     handleTouchStart(e) {
       if (e.touches.length === 2) {
-        // Calculate initial touch distance
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         uiState.initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
@@ -1325,7 +1210,8 @@ const ROVMap = (() => {
       const chevronIcon = document.getElementById("targetChevron");
 
       targetContainer.style.display = "none";
-      chevronIcon.className = "mdi mdi-chevron-down v-icon notranslate v-theme--dark v-icon--size-default";
+      chevronIcon.className =
+        "mdi mdi-chevron-down v-icon notranslate v-theme--dark v-icon--size-default";
 
       document
         .getElementById("toggleTargetContainer")
@@ -1336,6 +1222,17 @@ const ROVMap = (() => {
       if (clearTrailBtn) {
         clearTrailBtn.addEventListener("click", () => {
           state.trail = [];
+          render.draw();
+        });
+      }
+
+      const clearTargetsBtn = document.getElementById("clearTargets");
+      if (clearTargetsBtn) {
+        clearTargetsBtn.addEventListener("click", () => {
+          state.targets = [];
+          state.activeTargetIndex = -1;
+          document.getElementById("addedTargetsContainer").innerHTML = "";
+          targets.saveTargets();
           render.draw();
         });
       }
@@ -1602,4 +1499,8 @@ const ROVMap = (() => {
   };
 })();
 
-ROVMap.init();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => ROVMap.init());
+} else {
+  ROVMap.init();
+}

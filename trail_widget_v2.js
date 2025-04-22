@@ -64,7 +64,7 @@ const ROVMap = (() => {
     resizeCanvas() {
       canvas.width = mapContainer.clientWidth;
       canvas.height = mapContainer.clientHeight;
-      render.draw();
+      render.requestDraw();
     },
     latLonToMeters(lat, lon, refLat, refLon) {
       const latMeters = (lat - refLat) * CONSTANTS.EARTH_RADIUS;
@@ -296,7 +296,7 @@ const ROVMap = (() => {
           }
           state.targets[index] = { lat, lon };
           targetInput.value = `${lat}, ${lon}`;
-          render.draw();
+          render.requestDraw();;
           targets.saveTargets();
         }
       });
@@ -389,7 +389,7 @@ const ROVMap = (() => {
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
 
-        render.draw();
+        render.requestDraw();;
       };
 
       const newDragHandle = dragHandle.cloneNode(true);
@@ -417,13 +417,13 @@ const ROVMap = (() => {
 
       selectBtn.addEventListener("click", () => {
         state.activeTargetIndex = index;
-        render.draw();
+        render.requestDraw();;
       });
 
       removeBtn.addEventListener("click", () => {
         state.targets.splice(index, 1);
         targets.compactTargets();
-        render.draw();
+        render.requestDraw();;
         targets.saveTargets();
       });
     },
@@ -473,7 +473,7 @@ const ROVMap = (() => {
         state.targets.push({ lat, lon });
         targets.createTargetEntry(newIndex);
         state.activeTargetIndex = newIndex;
-        render.draw();
+        render.requestDraw();;
         input.value = "";
         targets.saveTargets();
       };
@@ -510,6 +510,43 @@ const ROVMap = (() => {
   };
 
   const render = {
+    animationFrameId: null,
+    updatePending: false,
+    fps: 10, // Target frame rate
+    lastFrameTime: 0,
+
+    startAnimationLoop() {
+      const frameInterval = 1000 / this.fps;
+      
+      const animationLoop = (timestamp) => {
+        // Calculate elapsed time since last frame
+        const elapsed = timestamp - this.lastFrameTime;
+        
+        // Only draw if enough time has passed for the target frame rate
+        // OR if an update was specifically requested
+        if (elapsed >= frameInterval || this.updatePending) {
+          this.lastFrameTime = timestamp - (elapsed % frameInterval);
+          this.draw();
+          this.updatePending = false;
+        }
+        
+        this.animationFrameId = requestAnimationFrame(animationLoop);
+      };
+      
+      this.animationFrameId = requestAnimationFrame(animationLoop);
+    },
+
+    stopAnimationLoop() {
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+    },
+
+    requestDraw() {
+      // this.updatePending = true;
+    },
+
     applyViewRotation(drawingFunction) {
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -1030,7 +1067,7 @@ const ROVMap = (() => {
       if (heading === undefined) return;
 
       state.currentHeading = heading;
-      render.draw();
+      render.requestDraw();;
     },
 
     updatePosition() {
@@ -1077,7 +1114,7 @@ const ROVMap = (() => {
 
       this.checkTargetProximity();
 
-      render.draw();
+      render.requestDraw();;
     },
 
     checkTargetProximity() {
@@ -1107,7 +1144,7 @@ const ROVMap = (() => {
           (state.activeTargetIndex + 1) % state.targets.length;
         console.log(`Moving to target ${state.activeTargetIndex + 1}`);
 
-        render.draw();
+        render.requestDraw();;
       }
     },
 
@@ -1142,7 +1179,7 @@ const ROVMap = (() => {
         CONSTANTS.MIN_SCALE,
         Math.min(state.scale, CONSTANTS.MAX_SCALE)
       );
-      render.draw();
+      render.requestDraw();;
     },
 
     handleTouchStart(e) {
@@ -1174,7 +1211,7 @@ const ROVMap = (() => {
           Math.min(state.scale, CONSTANTS.MAX_SCALE)
         );
 
-        render.draw();
+        render.requestDraw();;
       }
     },
 
@@ -1185,7 +1222,7 @@ const ROVMap = (() => {
         state.gridOrigin.lat = state.currentPosition.lat;
         state.gridOrigin.lon = state.currentPosition.lon;
       }
-      render.draw();
+      render.requestDraw();;
     },
 
     // Handle target container toggle
@@ -1237,7 +1274,7 @@ const ROVMap = (() => {
       if (clearTrailBtn) {
         clearTrailBtn.addEventListener("click", () => {
           state.trail = [];
-          render.draw();
+          render.requestDraw();;
         });
       }
 
@@ -1248,7 +1285,7 @@ const ROVMap = (() => {
           state.activeTargetIndex = -1;
           document.getElementById("addedTargetsContainer").innerHTML = "";
           targets.saveTargets();
-          render.draw();
+          render.requestDraw();;
         });
       }
 
@@ -1264,7 +1301,7 @@ const ROVMap = (() => {
                 : "mdi mdi-navigation v-icon notranslate v-theme--dark v-icon--size-default";
           }
 
-          render.draw();
+          render.requestDraw();;
         });
       }
     },
@@ -1467,7 +1504,7 @@ const ROVMap = (() => {
 
       // Save targets and redraw
       targets.saveTargets();
-      render.draw();
+      render.requestDraw();;
     },
 
     // Setup event listeners for file import
@@ -1525,7 +1562,7 @@ const ROVMap = (() => {
       events.setupEventListeners();
       mavlink.setupListeners();
       gpxImport.setupGPXImport();
-      render.draw();
+      render.startAnimationLoop();
     },
   };
 })();

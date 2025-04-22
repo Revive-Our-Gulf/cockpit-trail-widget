@@ -80,14 +80,13 @@ const ROVMap = (() => {
         y: canvas.height / 2 + helpers.metersToPixels(meters.y) * state.scale,
       };
     },
-    calculateLatLonDistance(pos1, pos2) {
-      const meters = helpers.latLonToMeters(
-        pos1.lat,
-        pos1.lon,
-        pos2.lat,
-        pos2.lon
-      );
-      return Math.sqrt(meters.x * meters.x + meters.y * meters.y);
+    toScreenCoordinates(point, applyScale = true) {
+      if (!point || !point.x || !point.y) return null;
+
+      return {
+        x: canvas.width / 2 + point.x * (applyScale ? state.scale : 1),
+        y: canvas.height / 2 + point.y * (applyScale ? state.scale : 1),
+      };
     },
     getGridSpacing() {
       const candidateSteps = [
@@ -124,6 +123,17 @@ const ROVMap = (() => {
       }
       return "";
     },
+    drawMarker(ctx, x, y, size, color, lineWidth) {
+      this.drawLine(ctx, x - size, y - size, x + size, y + size, {
+        color,
+        width: lineWidth,
+      });
+      this.drawLine(ctx, x + size, y - size, x - size, y + size, {
+        color,
+        width: lineWidth,
+      });
+    },
+
     drawLine(ctx, startX, startY, endX, endY, style = {}) {
       ctx.save();
       ctx.strokeStyle = style.color || STYLES.COLORS.TRAIL;
@@ -141,29 +151,24 @@ const ROVMap = (() => {
   };
 
   const geoUtils = {
-    latLonToScreen(lat, lon, referencePoint = null) {
+    latLonToScreenPos(pos, applyScale = true) {
       const ref = state.currentPosition;
-      if (!ref || !ref.lat) return null;
 
-      const latMeters = (lat - ref.lat) * CONSTANTS.EARTH_RADIUS;
+      const latMeters = (pos.lat - ref.lat) * CONSTANTS.EARTH_RADIUS;
       const lonMeters =
-        (lon - ref.lon) *
+        (pos.lon - ref.lon) *
         CONSTANTS.EARTH_RADIUS *
         Math.cos((ref.lat * Math.PI) / 180);
 
+      const x = lonMeters * CONSTANTS.BASE_SCALE;
+      const y = -latMeters * CONSTANTS.BASE_SCALE;
+
       return {
-        x: lonMeters * CONSTANTS.BASE_SCALE,
-        y: -latMeters * CONSTANTS.BASE_SCALE,
+        x: canvas.width / 2 + x * (applyScale ? state.scale : 1),
+        y: canvas.height / 2 + y * (applyScale ? state.scale : 1),
       };
     },
 
-    // Convert a target object directly to screen coordinates
-    targetToScreen(target) {
-      if (!target || !target.lat || !target.lon) return null;
-      return this.latLonToScreen(target.lat, target.lon);
-    },
-
-    // Calculate distance between two lat/lon positions directly
     getDistance(pos1, pos2) {
       if (!pos1 || !pos2) return 0;
 
@@ -176,7 +181,6 @@ const ROVMap = (() => {
       return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
     },
 
-    // Get bearing between two points (returns degrees from north)
     getBearing(from, to) {
       const dLon = (to.lon - from.lon) * (Math.PI / 180);
       const y = Math.sin(dLon) * Math.cos(to.lat * (Math.PI / 180));
@@ -190,19 +194,17 @@ const ROVMap = (() => {
       return (bearing + 360) % 360;
     },
 
-    // Check if a target is within the visible area
     isTargetVisible(target, padding = 50) {
-      const pos = this.targetToScreen(target);
+      const pos = this.latLonToScreenPos(target, false);
       if (!pos) return false;
-    
+
       const scaledX = pos.x * state.scale;
       const scaledY = pos.y * state.scale;
-      
+
       const diagonal = Math.sqrt(
-        Math.pow(canvas.width/2, 2) + 
-        Math.pow(canvas.height/2, 2)
+        Math.pow(canvas.width / 2, 2) + Math.pow(canvas.height / 2, 2)
       );
-      
+
       const distance = Math.sqrt(scaledX * scaledX + scaledY * scaledY);
       return distance < diagonal + padding;
     },
@@ -574,31 +576,25 @@ const ROVMap = (() => {
         state.trail.length < 2
       )
         return;
+
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate(-state.currentHeading * (Math.PI / 180));
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
       for (let i = 1; i < state.trail.length; i++) {
         const prevPoint = state.trail[i - 1];
         const currentPoint = state.trail[i];
-        const prevPixels = geoUtils.latLonToScreen(
-          prevPoint.lat,
-          prevPoint.lon,
-          state.currentPosition
-        );
-        const currentPixels = geoUtils.latLonToScreen(
-          currentPoint.lat,
-          currentPoint.lon,
-          state.currentPosition
-        );
-        
-        // Apply scaling consistently
+
+        const prevScreenPos = geoUtils.latLonToScreenPos(prevPoint, true);
+        const currentScreenPos = geoUtils.latLonToScreenPos(currentPoint, true);
+
         helpers.drawLine(
           ctx,
-          canvas.width / 2 + prevPixels.x * state.scale,
-          canvas.height / 2 + prevPixels.y * state.scale,
-          canvas.width / 2 + currentPixels.x * state.scale,
-          canvas.height / 2 + currentPixels.y * state.scale,
+          prevScreenPos.x,
+          prevScreenPos.y,
+          currentScreenPos.x,
+          currentScreenPos.y,
           {
             color: STYLES.COLORS.TRAIL,
             width: STYLES.LINES.TRAIL,
@@ -606,6 +602,7 @@ const ROVMap = (() => {
           }
         );
       }
+
       ctx.restore();
     },
 
@@ -676,28 +673,22 @@ const ROVMap = (() => {
       ctx.beginPath();
       ctx.strokeStyle = "#999999";
       ctx.lineWidth = STYLES.LINES.TARGET_LINE;
-    
+
       state.targets.forEach((target, index) => {
         if (!target) return;
-        const targetPixels = geoUtils.targetToScreen(target);
-        if (!targetPixels) return;
-        
-        // Apply scaling to get correct screen coordinates
-        const screenX = canvas.width / 2 + targetPixels.x * state.scale;
-        const screenY = canvas.height / 2 + targetPixels.y * state.scale;
-    
+        const screenPos = geoUtils.latLonToScreenPos(target);
+
         if (index > 0 && state.targets[index - 1]) {
-          const prevPixels = geoUtils.targetToScreen(state.targets[index - 1]);
-          if (!prevPixels) return;
-          
-          // Apply scaling to previous target as well
-          const prevScreenX = canvas.width / 2 + prevPixels.x * state.scale;
-          const prevScreenY = canvas.height / 2 + prevPixels.y * state.scale;
-    
+          const prevScreenPos = geoUtils.latLonToScreenPos(
+            state.targets[index - 1]
+          );
+
           helpers.drawLine(
             ctx,
-            prevScreenX, prevScreenY,
-            screenX, screenY,
+            prevScreenPos.x,
+            prevScreenPos.y,
+            screenPos.x,
+            screenPos.y,
             {
               color: STYLES.COLORS.TARGET_LINE,
               width: STYLES.LINES.TARGET_LINE,
@@ -713,38 +704,28 @@ const ROVMap = (() => {
         !state.targets[state.activeTargetIndex]
       )
         return;
-    
+
       const target = state.targets[state.activeTargetIndex];
-      const targetPixels = geoUtils.targetToScreen(target);
-      if (!targetPixels) return;
-    
-      // Apply proper scaling
-      const scaledTarget = {
-        x: canvas.width / 2 + targetPixels.x * state.scale,
-        y: canvas.height / 2 + targetPixels.y * state.scale
-      };
-    
-      const currentPixels = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-      };
-    
+      const scaledTarget = geoUtils.latLonToScreenPos(target);
+
+      const currentPixels = { x: canvas.width / 2, y: canvas.height / 2 };
+
       const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
         currentPixels,
         scaledTarget
       );
-    
+
       this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
         color: STYLES.COLORS.DISTANCE_LINE_PRIMARY,
         width: STYLES.LINES.TARGET_LINE,
         dashed: [5, 5],
       });
-    
+
       const distanceMeters = geoUtils.getDistance(
         state.currentPosition,
         target
       );
-    
+
       this._drawDistanceLabel(
         textPosition,
         distanceMeters,
@@ -761,44 +742,37 @@ const ROVMap = (() => {
       ) {
         return;
       }
-    
+
       const prevIndex =
         (state.activeTargetIndex - 1 + state.targets.length) %
         state.targets.length;
-    
+
       if (prevIndex === state.activeTargetIndex) return;
-    
+
       const prevTarget = state.targets[prevIndex];
-      const targetPixels = geoUtils.targetToScreen(prevTarget);
-      if (!targetPixels) return;
-    
-      // Apply proper scaling
-      const scaledTarget = {
-        x: canvas.width / 2 + targetPixels.x * state.scale,
-        y: canvas.height / 2 + targetPixels.y * state.scale
-      };
-    
+      const scaledTarget = geoUtils.latLonToScreenPos(prevTarget);
+
       const currentPixels = {
         x: canvas.width / 2,
         y: canvas.height / 2,
       };
-    
+
       const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
         currentPixels,
         scaledTarget
       );
-    
+
       this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
         color: STYLES.COLORS.DISTANCE_LINE_SECONDARY,
         width: STYLES.LINES.TARGET_LINE,
         dashed: [5, 5],
       });
-    
-      const distanceMeters = helpers.calculateLatLonDistance(
+
+      const distanceMeters = geoUtils.getDistance(
         state.currentPosition,
         prevTarget
       );
-    
+
       this._drawDistanceLabel(
         textPosition,
         distanceMeters,
@@ -812,39 +786,40 @@ const ROVMap = (() => {
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance < 10) {
-      return {
-        lineEndPoint: end,
-        textPosition: {
-        x: (start.x + end.x) / 2,
-        y: (start.y + end.y) / 2
-        }
-      };
+        return {
+          lineEndPoint: end,
+          textPosition: {
+            x: (start.x + end.x) / 2,
+            y: (start.y + end.y) / 2,
+          },
+        };
       }
 
       const dirX = dx / distance;
       const dirY = dy / distance;
 
-      const diagonal = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2;
+      const diagonal =
+        Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2;
       const isTargetVisible = distance < diagonal;
 
       let lineEndPoint;
       if (isTargetVisible) {
-      lineEndPoint = { x: end.x, y: end.y };
+        lineEndPoint = { x: end.x, y: end.y };
       } else {
-      const extendedDistance = diagonal * 1.5;
-      lineEndPoint = {
-        x: start.x + dirX * extendedDistance,
-        y: start.y + dirY * extendedDistance
-      };
+        const extendedDistance = diagonal * 1.5;
+        lineEndPoint = {
+          x: start.x + dirX * extendedDistance,
+          y: start.y + dirY * extendedDistance,
+        };
       }
 
-      const textDistance = isTargetVisible 
-      ? distance / 2 
-      : Math.min(distance / 2, diagonal / 2);
+      const textDistance = isTargetVisible
+        ? distance / 2
+        : Math.min(distance / 2, diagonal / 2);
 
       const textPosition = {
-      x: start.x + dirX * textDistance,
-      y: start.y + dirY * textDistance
+        x: start.x + dirX * textDistance,
+        y: start.y + dirY * textDistance,
       };
 
       return { lineEndPoint, textPosition };
@@ -865,90 +840,94 @@ const ROVMap = (() => {
       state.targets.forEach((target, index) => {
         if (!target) return;
 
-        const targetPixels = geoUtils.targetToScreen(target);
-        if (!targetPixels) return;
+        const screenPos = geoUtils.latLonToScreenPos(target);
 
-        const screenX = canvas.width / 2 + targetPixels.x * state.scale;
-        const screenY = canvas.height / 2 + targetPixels.y * state.scale;
+        const size = 12;
+        const color = index === state.activeTargetIndex ? STYLES.COLORS.TARGET : "#999999";
 
-        if (geoUtils.isTargetVisible(target)) {
-          const size = 12;
-          const color =
-            index === state.activeTargetIndex
-              ? STYLES.COLORS.TARGET
-              : "#999999";
-
-          helpers.drawLine(
-            ctx,
-            screenX - size,
-            screenY - size,
-            screenX + size,
-            screenY + size,
-            { color: color, width: STYLES.LINES.TARGET }
-          );
-          helpers.drawLine(
-            ctx,
-            screenX + size,
-            screenY - size,
-            screenX - size,
-            screenY + size,
-            { color: color, width: STYLES.LINES.TARGET }
-          );
-        }
+        helpers.drawMarker(
+          ctx,
+          screenPos.x,
+          screenPos.y,
+          size,
+          color,
+          STYLES.LINES.TARGET
+        );
       });
     },
 
     drawGrid() {
       if (!state.currentPosition.lat || !state.currentPosition.lon) return;
-    
+
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate(-state.currentHeading * (Math.PI / 180));
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    
+
+      const gridParams = this._calculateGridParameters();
+      this._drawGridLines(ctx, gridParams);
+
+      ctx.restore();
+    },
+
+    _calculateGridParameters() {
       const gridSpacing = helpers.getGridSpacing();
       const effectiveMultiplier = CONSTANTS.BASE_SCALE * state.scale;
-    
-      // Calculate grid boundaries with extra padding to avoid seeing edges during rotation
-      // Use the diagonal length of the canvas as the maximum extent
-      const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
-      const extraPadding = diagonal / 2; // Extra padding to ensure grid covers rotated view
-    
-      const leftMeters = -(canvas.width / 2 + extraPadding) / effectiveMultiplier;
-      const rightMeters = (canvas.width / 2 + extraPadding) / effectiveMultiplier;
-      const topMeters = -(canvas.height / 2 + extraPadding) / effectiveMultiplier;
-      const bottomMeters = (canvas.height / 2 + extraPadding) / effectiveMultiplier;
-    
-      // Apply grid offset from ROV movement
-      const offsetX = state.gridOffset.x % gridSpacing;
-      const offsetY = state.gridOffset.y % gridSpacing;
-    
+
+      // Calculate grid boundaries with padding for rotation
+      const diagonal = Math.sqrt(
+        canvas.width * canvas.width + canvas.height * canvas.height
+      );
+      const extraPadding = diagonal / 2;
+
+      return {
+        gridSpacing,
+        effectiveMultiplier,
+        bounds: {
+          left: -(canvas.width / 2 + extraPadding) / effectiveMultiplier,
+          right: (canvas.width / 2 + extraPadding) / effectiveMultiplier,
+          top: -(canvas.height / 2 + extraPadding) / effectiveMultiplier,
+          bottom: (canvas.height / 2 + extraPadding) / effectiveMultiplier,
+        },
+        offset: {
+          x: state.gridOffset.x % gridSpacing,
+          y: state.gridOffset.y % gridSpacing,
+        },
+      };
+    },
+
+    _drawGridLines(ctx, params) {
+      const { gridSpacing, bounds, offset } = params;
+
       ctx.beginPath();
       ctx.strokeStyle = STYLES.COLORS.GRID;
       ctx.lineWidth = 1;
-    
-      // Draw vertical grid lines
-      const startX = Math.floor(leftMeters / gridSpacing) * gridSpacing - offsetX;
-      const endX = Math.ceil(rightMeters / gridSpacing) * gridSpacing - offsetX;
+
+      const startX =
+        Math.floor(bounds.left / gridSpacing) * gridSpacing - offset.x;
+      const endX =
+        Math.ceil(bounds.right / gridSpacing) * gridSpacing - offset.x;
+
       for (let x = startX; x <= endX; x += gridSpacing) {
-        const startPoint = helpers.worldToScreen({ x, y: topMeters });
-        const endPoint = helpers.worldToScreen({ x, y: bottomMeters });
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.lineTo(endPoint.x, endPoint.y);
+        const start = helpers.worldToScreen({ x, y: bounds.top });
+        const end = helpers.worldToScreen({ x, y: bounds.bottom });
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
       }
-    
-      // Draw horizontal grid lines
-      const startY = Math.floor(topMeters / gridSpacing) * gridSpacing - offsetY;
-      const endY = Math.ceil(bottomMeters / gridSpacing) * gridSpacing - offsetY;
+
+      const startY =
+        Math.floor(bounds.top / gridSpacing) * gridSpacing - offset.y;
+      const endY =
+        Math.ceil(bounds.bottom / gridSpacing) * gridSpacing - offset.y;
+
       for (let y = startY; y <= endY; y += gridSpacing) {
-        const startPoint = helpers.worldToScreen({ x: leftMeters, y });
-        const endPoint = helpers.worldToScreen({ x: rightMeters, y });
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.lineTo(endPoint.x, endPoint.y);
+        const start = helpers.worldToScreen({ x: bounds.left, y });
+        const end = helpers.worldToScreen({ x: bounds.right, y });
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
       }
-    
+
       ctx.stroke();
-      ctx.restore();
     },
 
     drawScaleIndicator() {

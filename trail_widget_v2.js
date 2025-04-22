@@ -18,18 +18,19 @@ const ROVMap = (() => {
   const STYLES = {
     COLORS: {
       ROV: "white",
-      TRAIL: "red",
-      TARGET: "magenta",
-      TARGET_LINE: "magenta",
+      TRAIL: "rgba(160, 0, 0, 1)",
+      ACTIVE_TARGET_ICON: 'limegreen',
+      INACTIVE_TARGET_ICON: 'white',
+      TARGET_LINE: 'white',
       DISTANCE_LINE_PRIMARY: "limegreen",
-      DISTANCE_LINE_SECONDARY: "grey",
+      DISTANCE_LINE_SECONDARY: "#999999",
       GRID: "rgba(68, 68, 68, 0.5)",
       NORTH: "#FF4444",
     },
     LINES: {
-      TRAIL: 4,
+      TRAIL: 3,
       TARGET: 5,
-      TARGET_LINE: 4,
+      TARGET_LINE: 3,
     },
   };
 
@@ -529,10 +530,10 @@ const ROVMap = (() => {
       ctx.closePath();
       ctx.fillStyle = STYLES.COLORS.ROV;
       ctx.fill();
-      helpers.drawLine(ctx, 0, -10, 0, -60, {
-        color: "grey",
-        width: 3,
-      });
+      // helpers.drawLine(ctx, 0, -10, 0, -60, {
+      //   color: "grey",
+      //   width: 3,
+      // });
       const northAngle = -state.currentHeading * (Math.PI / 180);
       const northLength = 55;
       const northX = Math.sin(northAngle) * northLength;
@@ -698,110 +699,100 @@ const ROVMap = (() => {
       });
     },
 
-    _drawActiveTargetLine() {
+    _drawTargetLine(targetIndex, lineColor, textColor) {
       if (
-        state.activeTargetIndex === -1 ||
-        !state.targets[state.activeTargetIndex]
+        targetIndex === -1 ||
+        !state.targets[targetIndex] ||
+        !state.currentPosition.lat ||
+        !state.currentPosition.lon
       )
         return;
-
-      const target = state.targets[state.activeTargetIndex];
+    
+      const target = state.targets[targetIndex];
       const scaledTarget = geoUtils.latLonToScreenPos(target);
-
       const currentPixels = { x: canvas.width / 2, y: canvas.height / 2 };
-
-      const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
+    
+      const { lineEndPoint, textPosition, angle } = this._calculateLineEndpoints(
         currentPixels,
         scaledTarget
       );
-
-      this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
-        color: STYLES.COLORS.DISTANCE_LINE_PRIMARY,
-        width: STYLES.LINES.TARGET_LINE,
-        dashed: [5, 5],
-      });
-
+    
+      ctx.beginPath();
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = STYLES.LINES.TARGET_LINE;
+      ctx.setLineDash([5, 5]);
+      ctx.moveTo(currentPixels.x, currentPixels.y);
+      ctx.lineTo(lineEndPoint.x, lineEndPoint.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    
       const distanceMeters = geoUtils.getDistance(
         state.currentPosition,
         target
       );
-
       this._drawDistanceLabel(
         textPosition,
         distanceMeters,
+        textColor,
+        angle
+      );
+    },
+    
+    _drawActiveTargetLine() {
+      this._drawTargetLine(
+        state.activeTargetIndex,
+        STYLES.COLORS.DISTANCE_LINE_PRIMARY,
         STYLES.COLORS.DISTANCE_LINE_PRIMARY
       );
     },
-
+    
     _drawPreviousTargetLine() {
-      if (
-        !state.targets.length ||
-        !state.currentPosition.lat ||
-        !state.currentPosition.lon ||
-        state.activeTargetIndex === -1
-      ) {
-        return;
-      }
-
+      if (state.activeTargetIndex === -1 || state.targets.length <= 1) return;
+      
       const prevIndex =
         (state.activeTargetIndex - 1 + state.targets.length) %
         state.targets.length;
-
+    
       if (prevIndex === state.activeTargetIndex) return;
-
-      const prevTarget = state.targets[prevIndex];
-      const scaledTarget = geoUtils.latLonToScreenPos(prevTarget);
-
-      const currentPixels = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-      };
-
-      const { lineEndPoint, textPosition } = this._calculateLineEndpoints(
-        currentPixels,
-        scaledTarget
-      );
-
-      this._drawLineWithTextGap(currentPixels, lineEndPoint, textPosition, {
-        color: STYLES.COLORS.DISTANCE_LINE_SECONDARY,
-        width: STYLES.LINES.TARGET_LINE,
-        dashed: [5, 5],
-      });
-
-      const distanceMeters = geoUtils.getDistance(
-        state.currentPosition,
-        prevTarget
-      );
-
-      this._drawDistanceLabel(
-        textPosition,
-        distanceMeters,
+      
+      this._drawTargetLine(
+        prevIndex, 
+        STYLES.COLORS.DISTANCE_LINE_SECONDARY,
         STYLES.COLORS.DISTANCE_LINE_SECONDARY
       );
     },
-
+    
     _calculateLineEndpoints(start, end) {
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-
+    
+      // Calculate the angle of the line
+      const angle = Math.atan2(dy, dx);
+    
       if (distance < 10) {
+        // For very close points, position text slightly offset
         return {
           lineEndPoint: end,
           textPosition: {
-            x: (start.x + end.x) / 2,
-            y: (start.y + end.y) / 2,
+            x: (start.x + end.x) / 2 + 20,
+            y: (start.y + end.y) / 2 - 10
           },
+          angle: angle
         };
       }
-
+    
       const dirX = dx / distance;
       const dirY = dy / distance;
-
-      const diagonal =
-        Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2;
+    
+      // Calculate perpendicular direction for text offset
+      const perpX = -dirY;
+      const perpY = dirX;
+      const offsetDistance = 30; // Offset distance from line
+    
+      const diagonal = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2;
       const isTargetVisible = distance < diagonal;
-
+    
       let lineEndPoint;
       if (isTargetVisible) {
         lineEndPoint = { x: end.x, y: end.y };
@@ -812,28 +803,39 @@ const ROVMap = (() => {
           y: start.y + dirY * extendedDistance,
         };
       }
-
+    
       const textDistance = isTargetVisible
         ? distance / 2
         : Math.min(distance / 2, diagonal / 2);
-
+    
+      // Position text beside the line by adding perpendicular offset
       const textPosition = {
-        x: start.x + dirX * textDistance,
-        y: start.y + dirY * textDistance,
+        x: start.x + dirX * textDistance + perpX * offsetDistance,
+        y: start.y + dirY * textDistance + perpY * offsetDistance,
       };
-
-      return { lineEndPoint, textPosition };
+    
+      return { lineEndPoint, textPosition, angle };
     },
 
-    _drawDistanceLabel(position, distanceMeters, textColour) {
-      const distanceText = distanceMeters.toFixed(0) + " m";
 
+    _drawDistanceLabel(position, distanceMeters, textColour, angle) {
+      const distanceText = distanceMeters.toFixed(1) + " m";
+      ctx.save();
+      ctx.translate(position.x, position.y);
+      
+      // Rotate text to match the line direction
+      // We add 90 degrees (π/2) to make text readable from bottom to top
+      ctx.rotate(angle + Math.PI / 2);
+      
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
+      const textWidth = ctx.measureText(distanceText).width;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+      ctx.fillRect(-textWidth / 2 - 4, -14, textWidth + 8, 28);
       ctx.fillStyle = textColour;
-      ctx.fillText(distanceText, position.x, position.y);
+      ctx.fillText(distanceText, 0, 0);
+      ctx.restore();
     },
 
     _drawTargetMarkers() {
@@ -843,7 +845,7 @@ const ROVMap = (() => {
         const screenPos = geoUtils.latLonToScreenPos(target);
 
         const size = 12;
-        const color = index === state.activeTargetIndex ? STYLES.COLORS.TARGET : "#999999";
+        const color = index === state.activeTargetIndex ? STYLES.COLORS.ACTIVE_TARGET_ICON : STYLES.COLORS.INACTIVE_TARGET_ICON;
 
         helpers.drawMarker(
           ctx,
@@ -933,19 +935,19 @@ const ROVMap = (() => {
     drawScaleIndicator() {
       const gridSpacing = helpers.getGridSpacing();
       const formattedValue =
-        gridSpacing >= 1000
-          ? (gridSpacing / 1000).toFixed(1) + " km"
-          : gridSpacing.toFixed(0) + " m";
+      gridSpacing >= 1000
+        ? (gridSpacing / 1000).toFixed(1) + " km"
+        : gridSpacing.toFixed(1) + " m";
 
       const padding = 20;
-      const x = padding;
+      const x = canvas.width - padding;
       const y = canvas.height - padding;
 
       ctx.save();
       ctx.font = "bold 20px Arial";
 
-      ctx.fillStyle = "white";
-      ctx.textAlign = "left";
+      ctx.fillStyle = "grey";
+      ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillText(formattedValue, x, y - 8);
       ctx.restore();

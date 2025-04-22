@@ -3,10 +3,13 @@
         <div class="flex-between">
             <p id="currentPos">ROV: </p>
             <div class="d-flex">
-                <button id="clearTargets" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target mr-2">
-                    <i class="mdi mdi-eraser v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2">
+                    <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
-                <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target mr-2">
+                <button id="clearTargets" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Clear All Targets">
+                    <i class="mdi mdi-map-marker-remove v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                </button>
+                <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Clear Path History">
                     <i class="mdi mdi-eraser v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
                 <button id="importGpx" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2">

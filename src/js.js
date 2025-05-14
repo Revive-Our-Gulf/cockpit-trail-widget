@@ -25,7 +25,7 @@ const ROVMap = (() => {
       DISTANCE_LINE_PRIMARY: "limegreen",
       DISTANCE_LINE_SECONDARY: "#999999",
       // GRID: "rgba(68, 68, 68, 0.5)",
-      GRID: "rgba(255, 255, 255, 0.1)",
+      GRID: "rgba(100, 100, 100, 1)",
       NORTH: "#FF4444",
     },
     LINES: {
@@ -296,7 +296,7 @@ const ROVMap = (() => {
           }
           state.targets[index] = { lat, lon };
           targetInput.value = `${lat}, ${lon}`;
-          render.requestDraw();;
+          render.requestDraw();
           targets.saveTargets();
         }
       });
@@ -389,7 +389,7 @@ const ROVMap = (() => {
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
 
-        render.requestDraw();;
+        render.requestDraw();
       };
 
       const newDragHandle = dragHandle.cloneNode(true);
@@ -417,13 +417,13 @@ const ROVMap = (() => {
 
       selectBtn.addEventListener("click", () => {
         state.activeTargetIndex = index;
-        render.requestDraw();;
+        render.requestDraw();
       });
 
       removeBtn.addEventListener("click", () => {
         state.targets.splice(index, 1);
         targets.compactTargets();
-        render.requestDraw();;
+        render.requestDraw();
         targets.saveTargets();
       });
     },
@@ -473,7 +473,7 @@ const ROVMap = (() => {
         state.targets.push({ lat, lon });
         targets.createTargetEntry(newIndex);
         state.activeTargetIndex = newIndex;
-        render.requestDraw();;
+        render.requestDraw();
         input.value = "";
         targets.saveTargets();
       };
@@ -517,11 +517,11 @@ const ROVMap = (() => {
 
     startAnimationLoop() {
       const frameInterval = 1000 / this.fps;
-      
+
       const animationLoop = (timestamp) => {
         // Calculate elapsed time since last frame
         const elapsed = timestamp - this.lastFrameTime;
-        
+
         // Only draw if enough time has passed for the target frame rate
         // OR if an update was specifically requested
         if (elapsed >= frameInterval || this.updatePending) {
@@ -529,10 +529,10 @@ const ROVMap = (() => {
           this.draw();
           this.updatePending = false;
         }
-        
+
         this.animationFrameId = requestAnimationFrame(animationLoop);
       };
-      
+
       this.animationFrameId = requestAnimationFrame(animationLoop);
     },
 
@@ -576,12 +576,12 @@ const ROVMap = (() => {
     drawROV() {
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
-    
+
       // In north-up mode, we need to rotate the ROV icon to match its heading
       if (state.viewMode === "north-up") {
         ctx.rotate(state.currentHeading * (Math.PI / 180));
       }
-    
+
       ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
       ctx.shadowBlur = 30;
       ctx.beginPath();
@@ -592,38 +592,38 @@ const ROVMap = (() => {
       ctx.closePath();
       ctx.fillStyle = STYLES.COLORS.ROV;
       ctx.fill();
-    
+
       // Save context again before drawing north indicator
       ctx.save();
-      
+
       // If in north-up mode, counter-rotate to keep north indicator steady
       if (state.viewMode === "north-up") {
         ctx.rotate(-state.currentHeading * (Math.PI / 180));
       }
-    
+
       // Now draw the north indicator (will be fixed in north-up mode)
       const northAngle = -state.currentHeading * (Math.PI / 180);
       const northLength = 55;
       const northX = Math.sin(northAngle) * northLength;
       const northY = -Math.cos(northAngle) * northLength;
-      
+
       // In north-up mode, north always points up
       if (state.viewMode === "north-up") {
         helpers.drawLine(ctx, 0, 0, 0, -northLength, {
           color: STYLES.COLORS.NORTH,
           width: 3.5,
         });
-        
+
         // Arrow for north indicator
         const arrowWidth = 12;
         ctx.beginPath();
         ctx.fillStyle = STYLES.COLORS.NORTH;
         ctx.moveTo(0, -northLength);
-        ctx.lineTo(-arrowWidth/2, -northLength + 10);
-        ctx.lineTo(arrowWidth/2, -northLength + 10);
+        ctx.lineTo(-arrowWidth / 2, -northLength + 10);
+        ctx.lineTo(arrowWidth / 2, -northLength + 10);
         ctx.closePath();
         ctx.fill();
-        
+
         // "N" label
         ctx.fillStyle = STYLES.COLORS.NORTH;
         ctx.font = "bold 16px Arial";
@@ -636,7 +636,7 @@ const ROVMap = (() => {
           color: STYLES.COLORS.NORTH,
           width: 3.5,
         });
-        
+
         // Arrow
         const arrowLength = 10;
         const arrowWidth = 12;
@@ -652,7 +652,7 @@ const ROVMap = (() => {
         ctx.lineTo(baseX - offsetX, baseY - offsetY);
         ctx.closePath();
         ctx.fill();
-        
+
         // "N" label
         ctx.fillStyle = STYLES.COLORS.NORTH;
         ctx.font = "bold 16px Arial";
@@ -663,7 +663,7 @@ const ROVMap = (() => {
         const labelY = -Math.cos(northAngle) * labelDistance;
         ctx.fillText("N", labelX, labelY);
       }
-      
+
       // Restore context after drawing north indicator
       ctx.restore();
       ctx.restore();
@@ -676,26 +676,19 @@ const ROVMap = (() => {
         state.trail.length < 2
       )
         return;
-    
+
       this.applyViewRotation(() => {
-        // Get base color components from the trail color
-        const trailColorBase = STYLES.COLORS.TRAIL;
-        const isRgba = trailColorBase.startsWith('rgba');
-        const baseColor = isRgba ? trailColorBase.substring(0, trailColorBase.lastIndexOf(',')) : 'rgba(160, 0, 0';
-        
+        const trailColor = STYLES.COLORS.TRAIL;
         for (let i = 1; i < state.trail.length; i++) {
           const prevPoint = state.trail[i - 1];
           const currentPoint = state.trail[i];
-    
-          const opacity = Math.max(0.1, i / state.trail.length);
-          const trailColor = `${baseColor}, ${opacity})`;
-          
+
           const prevScreenPos = geoUtils.latLonToScreenPos(prevPoint, true);
           const currentScreenPos = geoUtils.latLonToScreenPos(
             currentPoint,
             true
           );
-    
+
           helpers.drawLine(
             ctx,
             prevScreenPos.x,
@@ -859,11 +852,9 @@ const ROVMap = (() => {
       const dy = end.y - start.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // Calculate the angle of the line
       const angle = Math.atan2(dy, dx);
 
       if (distance < 10) {
-        // For very close points, position text slightly offset
         return {
           lineEndPoint: end,
           textPosition: {
@@ -914,9 +905,15 @@ const ROVMap = (() => {
       const distanceText = distanceMeters.toFixed(1) + " m";
       ctx.save();
       ctx.translate(position.x, position.y);
+
+      if (state.viewMode === "north-up") {
+        ctx.rotate(0);
+      }
+      else{
+        ctx.rotate(state.currentHeading * (Math.PI / 180));
+      }
       
-      ctx.rotate(angle + Math.PI / 2);
-      
+
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -1034,7 +1031,7 @@ const ROVMap = (() => {
       ctx.save();
       ctx.font = "bold 20px Arial";
 
-      ctx.fillStyle = "grey";
+      ctx.fillStyle = STYLES.COLORS.GRID;
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillText(formattedValue, x, y - 8);
@@ -1067,7 +1064,7 @@ const ROVMap = (() => {
       if (heading === undefined) return;
 
       state.currentHeading = heading;
-      render.requestDraw();;
+      render.requestDraw();
     },
 
     updatePosition() {
@@ -1114,7 +1111,7 @@ const ROVMap = (() => {
 
       this.checkTargetProximity();
 
-      render.requestDraw();;
+      render.requestDraw();
     },
 
     checkTargetProximity() {
@@ -1144,7 +1141,7 @@ const ROVMap = (() => {
           (state.activeTargetIndex + 1) % state.targets.length;
         console.log(`Moving to target ${state.activeTargetIndex + 1}`);
 
-        render.requestDraw();;
+        render.requestDraw();
       }
     },
 
@@ -1179,7 +1176,7 @@ const ROVMap = (() => {
         CONSTANTS.MIN_SCALE,
         Math.min(state.scale, CONSTANTS.MAX_SCALE)
       );
-      render.requestDraw();;
+      render.requestDraw();
     },
 
     handleTouchStart(e) {
@@ -1211,7 +1208,7 @@ const ROVMap = (() => {
           Math.min(state.scale, CONSTANTS.MAX_SCALE)
         );
 
-        render.requestDraw();;
+        render.requestDraw();
       }
     },
 
@@ -1222,7 +1219,7 @@ const ROVMap = (() => {
         state.gridOrigin.lat = state.currentPosition.lat;
         state.gridOrigin.lon = state.currentPosition.lon;
       }
-      render.requestDraw();;
+      render.requestDraw();
     },
 
     // Handle target container toggle
@@ -1274,7 +1271,7 @@ const ROVMap = (() => {
       if (clearTrailBtn) {
         clearTrailBtn.addEventListener("click", () => {
           state.trail = [];
-          render.requestDraw();;
+          render.requestDraw();
         });
       }
 
@@ -1285,7 +1282,7 @@ const ROVMap = (() => {
           state.activeTargetIndex = -1;
           document.getElementById("addedTargetsContainer").innerHTML = "";
           targets.saveTargets();
-          render.requestDraw();;
+          render.requestDraw();
         });
       }
 
@@ -1301,7 +1298,7 @@ const ROVMap = (() => {
                 : "mdi mdi-navigation v-icon notranslate v-theme--dark v-icon--size-default";
           }
 
-          render.requestDraw();;
+          render.requestDraw();
         });
       }
     },
@@ -1504,7 +1501,7 @@ const ROVMap = (() => {
 
       // Save targets and redraw
       targets.saveTargets();
-      render.requestDraw();;
+      render.requestDraw();
     },
 
     // Setup event listeners for file import

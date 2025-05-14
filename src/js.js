@@ -6,10 +6,10 @@ const ROVMap = (() => {
 
   const CONSTANTS = {
     MIN_DISTANCE: 0.5,
-    MAX_TRAIL_POINTS: 100,
+    MAX_TRAIL_POINTS: 300,
     EARTH_RADIUS: 111320,
     BASE_SCALE: 20,
-    MIN_SCALE: 0.1,
+    MIN_SCALE: 0.01,
     MAX_SCALE: 20,
     TARGET_REACHED_THRESHOLD: 1.0,
     ROV_SIZE: 20,
@@ -519,17 +519,14 @@ const ROVMap = (() => {
       const frameInterval = 1000 / this.fps;
 
       const animationLoop = (timestamp) => {
-        // Calculate elapsed time since last frame
         const elapsed = timestamp - this.lastFrameTime;
 
-        // Only draw if enough time has passed for the target frame rate
-        // OR if an update was specifically requested
-        if (elapsed >= frameInterval || this.updatePending) {
+        const shouldDraw = elapsed >= frameInterval || this.updatePending;
+        if (shouldDraw) {
           this.lastFrameTime = timestamp - (elapsed % frameInterval);
           this.draw();
           this.updatePending = false;
         }
-
         this.animationFrameId = requestAnimationFrame(animationLoop);
       };
 
@@ -674,32 +671,38 @@ const ROVMap = (() => {
         !state.currentPosition.lat ||
         !state.currentPosition.lon ||
         state.trail.length < 2
-      )
+      ) {
         return;
+      }
 
       this.applyViewRotation(() => {
-        const trailColor = STYLES.COLORS.TRAIL;
-        for (let i = 1; i < state.trail.length; i++) {
-          const prevPoint = state.trail[i - 1];
-          const currentPoint = state.trail[i];
+        ctx.save();
+        try {
+          // Set common style once
+          ctx.strokeStyle = STYLES.COLORS.TRAIL;
+          ctx.lineWidth = STYLES.LINES.TRAIL;
+          ctx.beginPath();
 
-          const prevScreenPos = geoUtils.latLonToScreenPos(prevPoint, true);
-          const currentScreenPos = geoUtils.latLonToScreenPos(
-            currentPoint,
-            true
-          );
+          // Cache the first point
+          const firstPoint = geoUtils.latLonToScreenPos(state.trail[0], true);
+          if (!firstPoint) return;
 
-          helpers.drawLine(
-            ctx,
-            prevScreenPos.x,
-            prevScreenPos.y,
-            currentScreenPos.x,
-            currentScreenPos.y,
-            {
-              color: trailColor,
-              width: STYLES.LINES.TRAIL,
-            }
-          );
+          ctx.moveTo(firstPoint.x, firstPoint.y);
+
+          // Draw all segments in one path
+          for (let i = 1; i < state.trail.length; i++) {
+            const currentPoint = geoUtils.latLonToScreenPos(
+              state.trail[i],
+              true
+            );
+            if (!currentPoint) continue;
+
+            ctx.lineTo(currentPoint.x, currentPoint.y);
+          }
+
+          ctx.stroke();
+        } finally {
+          ctx.restore();
         }
       });
     },
@@ -908,11 +911,9 @@ const ROVMap = (() => {
 
       if (state.viewMode === "north-up") {
         ctx.rotate(0);
-      }
-      else{
+      } else {
         ctx.rotate(state.currentHeading * (Math.PI / 180));
       }
-      
 
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
@@ -1551,7 +1552,6 @@ const ROVMap = (() => {
   return {
     // Initialize the application
     init() {
-      helpers.resizeCanvas();
       targets.setupNewTargetInput();
       targets.loadTargets();
       targets.setupDragAndDrop();
@@ -1560,6 +1560,8 @@ const ROVMap = (() => {
       mavlink.setupListeners();
       gpxImport.setupGPXImport();
       render.startAnimationLoop();
+
+      helpers.resizeCanvas();
     },
   };
 })();

@@ -13,7 +13,7 @@
                 <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target" title="Toggle Targets Panel">
                     <i class="mdi mdi-chevron-up v-icon notranslate v-theme--dark v-icon--size-default" id="targetChevron"></i>
                 </button>
-                <input type="file" id="gpxFileInput" accept=".kml" style="display:none">
+                <input type="file" id="kmlFileInput" style="display: none;" accept=".kml" />
             </div>
         </div>
 
@@ -43,9 +43,6 @@
                     <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>    
                 </button>
             </div>
-            
-            <!-- Added Targets Container -->
-            <div id="addedTargetsContainer"></div>
 
             <!-- KML File Import Section -->
             <div id="kmlFileRow" class="kml-file-row" style="display: none; margin-top: 8px;">
@@ -55,21 +52,30 @@
                         <span>No file selected</span>
                     </div>
                     <button id="closeKmlFile" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text">
-                        <i class="mdi mdi-close v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                        <i class="mdi mdi-trash-can v-icon notranslate v-theme--dark v-icon--size-default"></i>
                     </button>
                 </div>
                 <select id="waypointSelect" class="flex items-center justify-center w-full py-1 pl-2 pr-8 text-base transition-all border-0 rounded-md shadow-inner cursor-pointer h-9 bg-slate-800/60 text-slate-100 hover:bg-slate-600/60" style="width: 100%;">
                     <option value="" disabled selected>Select a waypoint</option>
                 </select>
             </div>
+
+            <!-- Added Targets Container -->
+            <div id="addedTargetsContainer"></div>
+            
         </div>
     </div>
     
     <!-- Map Container -->
     <div id="mapContainer">
         <canvas id="mapCanvas"></canvas>
-        <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-large v-btn--variant-text toggleView" title="Toggle View Mode">
-            <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-default"></i>
-        </button>
+        <div class="d-flex flex-column map-controls">
+            <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-large v-btn--variant-text" title="Toggle View Mode">
+                <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-large"></i>
+            </button>
+            <button id="recenterROV" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-large v-btn--variant-text" title="Recenter ROV">
+                <i class="mdi mdi-crosshairs-gps v-icon notranslate v-theme--dark v-icon--size-large"></i>
+            </button>
+        </div>
     </div>
 </div>

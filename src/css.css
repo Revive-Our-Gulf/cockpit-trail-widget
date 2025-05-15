@@ -56,10 +56,7 @@
 }
 
 #targetContainer {
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
+    position: relative;
 }
 
 .target-input-group {
@@ -157,9 +154,25 @@
     max-width: 80%;
 }
 
-.toggleView {
+.map-controls {
     position: absolute;
-    bottom: 5%;
-    left: 5%;
+    bottom: 12px;
+    left: 12px;
     z-index: 10;
+}
+
+#newTargetInput {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+#newTargetInput .v-input {
+    flex: 1 1 200px;
+    min-width: 0;
+    margin-right: 8px;
+}
+
+#newTargetInput button {
+    flex: 0 0 auto;
 }

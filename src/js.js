@@ -240,7 +240,7 @@ const ROVMap = (() => {
           <i class="mdi-target mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
         </button>
         <button type="button" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text remove-target">
-          <i class="mdi-close mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
+          <i class="mdi-trash-can mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
         </button>
       </div>
       `;
@@ -409,7 +409,7 @@ const ROVMap = (() => {
   const render = {
     animationFrameId: null,
     updatePending: false,
-    fps: 10, // Target frame rate
+    fps: 24, // Target frame rate
     lastFrameTime: 0,
 
     startAnimationLoop() {
@@ -1416,7 +1416,7 @@ const ROVMap = (() => {
 
     setupKMLImport() {
       const importBtn = document.getElementById("importKml");
-      const fileInput = document.getElementById("gpxFileInput");
+      const fileInput = document.getElementById("kmlFileInput");
       const closeKmlFileBtn = document.getElementById("closeKmlFile");
       const waypointSelect = document.getElementById("waypointSelect");
 
@@ -1451,6 +1451,25 @@ const ROVMap = (() => {
 
             // Populate dropdown
             this.populateWaypointDropdown(waypoints, file.name);
+
+            // Hide the newTargetInput when KML is imported
+            document.getElementById("newTargetInput").style.visibility =
+              "hidden";
+            document.getElementById("newTargetInput").style.height = "0";
+            document.getElementById("newTargetInput").style.overflow = "hidden";
+            document.getElementById("newTargetInput").style.margin = "0";
+
+            // Make sure target container is visible
+            const targetContainer = document.getElementById("targetContainer");
+            const chevronIcon = document.getElementById("targetChevron");
+
+            // Only change if it's currently hidden
+            if (targetContainer.style.display === "none") {
+              targetContainer.style.display = "block";
+              chevronIcon.className =
+                "mdi mdi-chevron-up v-icon notranslate v-theme--dark v-icon--size-default";
+              helpers.resizeCanvas();
+            }
           } catch (error) {
             console.error(`Error importing file: ${error.message}`);
           }
@@ -1479,6 +1498,12 @@ const ROVMap = (() => {
         closeKmlFileBtn.addEventListener("click", () => {
           document.getElementById("kmlFileRow").style.display = "none";
           state.importedWaypoints = [];
+
+          document.getElementById("newTargetInput").style.visibility =
+            "visible";
+          document.getElementById("newTargetInput").style.height = "auto";
+          document.getElementById("newTargetInput").style.overflow = "visible";
+          document.getElementById("newTargetInput").style.margin = "";
         });
       }
     },

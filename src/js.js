@@ -105,27 +105,6 @@ const ROVMap = (() => {
       }
       return candidateSteps[candidateSteps.length - 1];
     },
-    setCookie(name, value, days) {
-      const d = new Date();
-      d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-      const expires = "expires=" + d.toUTCString();
-      document.cookie =
-        name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
-    },
-    getCookie(name) {
-      const cname = name + "=";
-      const decodedCookie = decodeURIComponent(document.cookie);
-      const ca = decodedCookie.split(";");
-      for (let c of ca) {
-        while (c.charAt(0) === " ") {
-          c = c.substring(1);
-        }
-        if (c.indexOf(cname) === 0) {
-          return c.substring(cname.length, c.length);
-        }
-      }
-      return "";
-    },
     drawMarker(ctx, x, y, size, color, lineWidth) {
       this.drawLine(ctx, x - size, y - size, x + size, y + size, {
         color,
@@ -214,31 +193,6 @@ const ROVMap = (() => {
   };
 
   const targets = {
-    saveTargets() {
-      helpers.setCookie(
-        "cockpit-trail-widget-targets",
-        JSON.stringify(state.targets),
-        365
-      );
-    },
-    loadTargets() {
-      const cookieVal = helpers.getCookie("cockpit-trail-widget-targets");
-      if (cookieVal) {
-        try {
-          state.targets = JSON.parse(cookieVal);
-          if (state.targets && state.targets.length > 0) {
-            state.activeTargetIndex = 0;
-            const container = document.getElementById("addedTargetsContainer");
-            container.innerHTML = "";
-            state.targets.forEach((target, index) => {
-              targets.createTargetEntry(index);
-            });
-          }
-        } catch (e) {
-          console.error("Error parsing targets cookie", e);
-        }
-      }
-    },
     createTargetEntry(index) {
       const inputGroup = document.createElement("div");
       inputGroup.className = "target-input-group";
@@ -299,7 +253,6 @@ const ROVMap = (() => {
           state.targets[index] = { lat, lon };
           targetInput.value = `${lat}, ${lon}`;
           render.requestDraw();
-          targets.saveTargets();
         }
       });
 
@@ -370,7 +323,6 @@ const ROVMap = (() => {
           ];
 
           targets.compactTargets();
-          targets.saveTargets();
 
           draggedElement = document.querySelector(
             `.target-input-group[data-index="${newIndex}"]`
@@ -426,7 +378,6 @@ const ROVMap = (() => {
         state.targets.splice(index, 1);
         targets.compactTargets();
         render.requestDraw();
-        targets.saveTargets();
       });
     },
 
@@ -477,7 +428,6 @@ const ROVMap = (() => {
         state.activeTargetIndex = newIndex;
         render.requestDraw();
         input.value = "";
-        targets.saveTargets();
       };
 
       addBtn.addEventListener("click", submitNewTarget);
@@ -1284,7 +1234,6 @@ const ROVMap = (() => {
           state.targets = [];
           state.activeTargetIndex = -1;
           document.getElementById("addedTargetsContainer").innerHTML = "";
-          targets.saveTargets();
           render.requestDraw();
         });
       }
@@ -1501,8 +1450,6 @@ const ROVMap = (() => {
       });
 
       state.activeTargetIndex = state.targets.length - waypoints.length;
-
-      targets.saveTargets();
       render.requestDraw();
     },
 
@@ -1554,7 +1501,6 @@ const ROVMap = (() => {
     // Initialize the application
     init() {
       targets.setupNewTargetInput();
-      targets.loadTargets();
       targets.setupDragAndDrop();
       targets.addDragStyles();
       events.setupEventListeners();

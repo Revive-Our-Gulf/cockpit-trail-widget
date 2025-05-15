@@ -202,9 +202,6 @@ const ROVMap = (() => {
 
       inputGroup.innerHTML = `
       <div class="target-entry" style="display: flex; align-items: center;">
-        <div class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-small v-btn--variant-text drag-handle mr-2">
-          <i class="mdi-drag-vertical mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
-        </div>
         <div class="v-input v-input--horizontal v-input--center-affix v-input--density-compact v-theme--light v-text-field" style="flex-grow: 1;">
           <div class="v-input__control">
             <div class="v-field v-field--active v-field--center-affix v-field--variant-outlined v-theme--light">
@@ -258,111 +255,6 @@ const ROVMap = (() => {
 
       document.getElementById("addedTargetsContainer").appendChild(inputGroup);
       targets.setupTargetEntryListeners(inputGroup, index);
-      targets.setupDragForElement(inputGroup);
-    },
-
-    setupDragAndDrop() {
-      const targetContainer = document.getElementById("addedTargetsContainer");
-
-      const observer = new MutationObserver((mutations) => {
-        for (let mutation of mutations) {
-          if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-            mutation.addedNodes.forEach((node) => {
-              if (
-                node.classList &&
-                node.classList.contains("target-input-group")
-              ) {
-                this.setupDragForElement(node);
-              }
-            });
-          }
-        }
-      });
-
-      observer.observe(targetContainer, { childList: true });
-    },
-
-    setupDragForElement(element) {
-      const dragHandle = element.querySelector(".drag-handle");
-      if (!dragHandle) return;
-
-      dragHandle.style.cursor = "grab";
-
-      let draggedElement = null;
-      let startY = 0;
-      let startIndex = 0;
-
-      const handleMouseMove = (e) => {
-        if (!draggedElement) return;
-
-        const container = document.getElementById("addedTargetsContainer");
-        const children = Array.from(container.children);
-
-        const currentY = e.clientY;
-
-        const targetElements = children.filter((el) => el !== draggedElement);
-        let swapWith = null;
-
-        targetElements.forEach((el) => {
-          const box = el.getBoundingClientRect();
-          const centerY = box.top + box.height / 2;
-
-          if (currentY < centerY && currentY > box.top) {
-            swapWith = el;
-          } else if (currentY > centerY && currentY < box.bottom) {
-            swapWith = el;
-          }
-        });
-
-        if (swapWith) {
-          const newIndex = parseInt(swapWith.dataset.index);
-
-          [state.targets[startIndex], state.targets[newIndex]] = [
-            state.targets[newIndex],
-            state.targets[startIndex],
-          ];
-
-          targets.compactTargets();
-
-          draggedElement = document.querySelector(
-            `.target-input-group[data-index="${newIndex}"]`
-          );
-          draggedElement.classList.add("target-dragging");
-          startIndex = newIndex;
-          startY = currentY;
-        }
-      };
-
-      const handleMouseUp = () => {
-        if (!draggedElement) return;
-
-        draggedElement.classList.remove("target-dragging");
-        draggedElement = null;
-        document.body.style.cursor = "";
-
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-
-        render.requestDraw();
-      };
-
-      const newDragHandle = dragHandle.cloneNode(true);
-      dragHandle.parentNode.replaceChild(newDragHandle, dragHandle);
-
-      newDragHandle.addEventListener("mousedown", (e) => {
-        draggedElement = element;
-        startY = e.clientY;
-        startIndex = parseInt(element.dataset.index);
-
-        document.body.style.cursor = "grabbing";
-
-        element.classList.add("target-dragging");
-
-        document.addEventListener("mousemove", handleMouseMove);
-        document.addEventListener("mouseup", handleMouseUp);
-
-        e.preventDefault();
-      });
     },
 
     setupTargetEntryListeners(inputGroup, index) {
@@ -438,27 +330,6 @@ const ROVMap = (() => {
         }
       });
     },
-
-    addDragStyles() {
-      const style = document.createElement("style");
-      style.textContent = `
-      .target-dragging {
-        opacity: 0.8;
-        background-color: rgba(0, 0, 0, 0.1);
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        position: relative;
-        z-index: 1000;
-        transition: transform 0.1s;
-      }
-      .drag-handle {
-        cursor: grab;
-      }
-      .drag-handle:active {
-        cursor: grabbing;
-      }
-      `;
-      document.head.appendChild(style);
-    },
   };
 
   const render = {
@@ -500,16 +371,13 @@ const ROVMap = (() => {
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
 
-      // Only apply heading rotation in 'rov-up' mode
       if (state.viewMode === "rov-up") {
         ctx.rotate(-state.currentHeading * (Math.PI / 180));
       }
 
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-      // Execute the provided drawing function
       drawingFunction();
-
       ctx.restore();
     },
 
@@ -1473,11 +1341,8 @@ const ROVMap = (() => {
 
   // Public methods
   return {
-    // Initialize the application
     init() {
       targets.setupNewTargetInput();
-      targets.setupDragAndDrop();
-      targets.addDragStyles();
       events.setupEventListeners();
       mavlink.setupListeners();
       gpxImport.setupGPXImport();

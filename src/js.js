@@ -1165,16 +1165,6 @@ const ROVMap = (() => {
       }
     },
 
-    // Handle double click to reset grid
-    handleDoubleClick() {
-      state.gridOffset = { x: 0, y: 0 };
-      if (state.currentPosition.lat) {
-        state.gridOrigin.lat = state.currentPosition.lat;
-        state.gridOrigin.lon = state.currentPosition.lon;
-      }
-      render.requestDraw();
-    },
-
     // Handle target container toggle
     handleToggleTargetContainer() {
       const targetContainer = document.getElementById("targetContainer");
@@ -1204,9 +1194,6 @@ const ROVMap = (() => {
       // Touch events for pinch zoom
       canvas.addEventListener("touchstart", this.handleTouchStart);
       canvas.addEventListener("touchmove", this.handleTouchMove);
-
-      // Double click to reset grid
-      canvas.addEventListener("dblclick", this.handleDoubleClick);
 
       const targetContainer = document.getElementById("targetContainer");
       const chevronIcon = document.getElementById("targetChevron");
@@ -1271,10 +1258,6 @@ const ROVMap = (() => {
               resolve(this.parseGPX(fileContent));
             } else if (fileExtension === "kml") {
               resolve(this.parseKML(fileContent));
-            } else if (fileExtension === "kmz") {
-              this.extractKMZ(fileContent)
-                .then((kmlContent) => resolve(this.parseKML(kmlContent)))
-                .catch(reject);
             } else {
               reject(new Error("Unsupported file format"));
             }
@@ -1425,13 +1408,6 @@ const ROVMap = (() => {
       return waypoints;
     },
 
-    // Placeholder for KMZ extraction (would need JSZip library for full implementation)
-    extractKMZ(kmzContent) {
-      return Promise.reject(
-        new Error("KMZ files are not supported yet. Convert to KML first.")
-      );
-    },
-
     addWaypointsAsTargets(waypoints) {
       if (!waypoints || waypoints.length === 0) return;
 
@@ -1459,8 +1435,7 @@ const ROVMap = (() => {
       const fileInput = document.getElementById("gpxFileInput");
 
       if (fileInput) {
-        // Update to accept KML files too
-        fileInput.accept = ".gpx,.kml,.kmz";
+        fileInput.accept = ".gpx,.kml";
       }
 
       if (importBtn && fileInput) {

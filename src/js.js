@@ -243,6 +243,9 @@ const ROVMap = (() => {
       const inputGroup = document.createElement("div");
       inputGroup.className = "target-input-group";
       inputGroup.dataset.index = index;
+
+      const targetName = state.targets[index].name || `Target ${index + 1}`;
+
       inputGroup.innerHTML = `
       <div class="target-entry" style="display: flex; align-items: center;">
         <div class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-small v-btn--variant-text drag-handle mr-2">
@@ -253,15 +256,13 @@ const ROVMap = (() => {
             <div class="v-field v-field--active v-field--center-affix v-field--variant-outlined v-theme--light">
               <div class="v-field__overlay"></div>
               <div class="v-field__field" data-no-activator>
-                <label class="v-label v-field-label">Target ${index + 1}</label>
+                <label class="v-label v-field-label">${targetName}</label>
                 <input type="text" class="v-field__input targetCoords">
               </div>
               <div class="v-field__outline">
                 <div class="v-field__outline__start"></div>
                 <div class="v-field__outline__notch">
-                  <label class="v-label v-field-label v-field-label--floating">Target ${
-                    index + 1
-                  }</label>
+                  <label class="v-label v-field-label v-field-label--floating">${targetName}</label>
                 </div>
                 <div class="v-field__outline__end"></div>
               </div>
@@ -275,10 +276,11 @@ const ROVMap = (() => {
           <i class="mdi-close mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
         </button>
       </div>
-    `;
+      `;
 
       const targetInput = inputGroup.querySelector(".targetCoords");
       targetInput.value = `${state.targets[index].lat}, ${state.targets[index].lon}`;
+
 
       targetInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
@@ -1481,26 +1483,25 @@ const ROVMap = (() => {
       );
     },
 
-    // Add waypoints as targets to the map
     addWaypointsAsTargets(waypoints) {
       if (!waypoints || waypoints.length === 0) return;
 
       state.targets = [];
       document.getElementById("addedTargetsContainer").innerHTML = "";
 
-      // Add waypoints as targets
       waypoints.forEach((waypoint) => {
         const newIndex = state.targets.length;
-        state.targets.push({ lat: waypoint.lat, lon: waypoint.lon });
+        state.targets.push({
+          lat: waypoint.lat,
+          lon: waypoint.lon,
+          name: waypoint.name || "", // Store the name if available
+        });
 
-        // Create UI entry for target
         targets.createTargetEntry(newIndex);
       });
 
-      // Set the first imported waypoint as active
       state.activeTargetIndex = state.targets.length - waypoints.length;
 
-      // Save targets and redraw
       targets.saveTargets();
       render.requestDraw();
     },

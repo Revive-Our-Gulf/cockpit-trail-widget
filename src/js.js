@@ -53,6 +53,8 @@ const ROVMap = (() => {
     gridOffset: { x: 0, y: 0 },
     lastPosition: { lat: null, lon: null },
     viewMode: "rov-up",
+    importedWaypoints: [],
+    waypointDropdownVisible: false,
   };
 
   let uiState = {
@@ -232,7 +234,6 @@ const ROVMap = (() => {
       const targetInput = inputGroup.querySelector(".targetCoords");
       targetInput.value = `${state.targets[index].lat}, ${state.targets[index].lon}`;
 
-
       targetInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
           const value = targetInput.value;
@@ -255,6 +256,65 @@ const ROVMap = (() => {
 
       document.getElementById("addedTargetsContainer").appendChild(inputGroup);
       targets.setupTargetEntryListeners(inputGroup, index);
+    },
+
+    createWaypointDropdown(waypoints, fileName) {
+      // Get dropdown elements
+      const waypointDropdown = document.getElementById("waypointDropdown");
+      const waypointList = document.getElementById("waypointList");
+      const waypointTitle = document.getElementById("waypointDropdownTitle");
+
+      // Clear previous waypoints and update title
+      waypointList.innerHTML = "";
+      waypointTitle.textContent = `Imported Waypoints (${fileName})`;
+
+      // Add waypoints to the list
+      waypoints.forEach((waypoint, index) => {
+        const item = document.createElement("div");
+        item.className = "waypoint-item";
+        item.style.display = "flex";
+        item.style.justifyContent = "space-between";
+        item.style.alignItems = "center";
+        item.style.padding = "4px 0";
+        item.style.borderBottom = "1px solid var(--v-border-color)";
+
+        const name = waypoint.name || `Waypoint ${index + 1}`;
+
+        item.innerHTML = `
+      <div>${name} (${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(
+          6
+        )})</div>
+      <button class="add-waypoint v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text">
+        <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
+      </button>
+    `;
+
+        waypointList.appendChild(item);
+
+        // Add click event to the add button
+        const addBtn = item.querySelector(".add-waypoint");
+        addBtn.addEventListener("click", () => {
+          this.addSingleWaypointAsTarget(waypoint);
+        });
+      });
+
+      // Show the dropdown
+      waypointDropdown.style.display = "block";
+    },
+
+    addSingleWaypointAsTarget(waypoint) {
+      if (!waypoint) return;
+
+      const newIndex = state.targets.length;
+      state.targets.push({
+        lat: waypoint.lat,
+        lon: waypoint.lon,
+        name: waypoint.name || "",
+      });
+
+      targets.createTargetEntry(newIndex);
+      state.activeTargetIndex = newIndex;
+      render.requestDraw();
     },
 
     setupTargetEntryListeners(inputGroup, index) {
@@ -1111,24 +1171,15 @@ const ROVMap = (() => {
     },
   };
 
-  const gpxImport = {
-    // Parse GPX or KML file and extract waypoints
+  const kmlImport = {
     parseFile(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onload = (e) => {
           const fileContent = e.target.result;
-          const fileExtension = file.name.split(".").pop().toLowerCase();
-
           try {
-            if (fileExtension === "gpx") {
-              resolve(this.parseGPX(fileContent));
-            } else if (fileExtension === "kml") {
-              resolve(this.parseKML(fileContent));
-            } else {
-              reject(new Error("Unsupported file format"));
-            }
+            resolve(this.parseKML(fileContent));
           } catch (error) {
             reject(error);
           }
@@ -1140,67 +1191,6 @@ const ROVMap = (() => {
 
         reader.readAsText(file);
       });
-    },
-
-    // Parse GPX content
-    parseGPX(gpxText) {
-      const parser = new DOMParser();
-      const gpxDoc = parser.parseFromString(gpxText, "text/xml");
-
-      // Check if parsing was successful
-      if (gpxDoc.documentElement.nodeName === "parsererror") {
-        throw new Error("Invalid GPX file");
-      }
-
-      const waypoints = [];
-
-      // Extract waypoints (wpt elements)
-      const wptNodes = gpxDoc.getElementsByTagName("wpt");
-      for (let i = 0; i < wptNodes.length; i++) {
-        const wpt = wptNodes[i];
-        const lat = parseFloat(wpt.getAttribute("lat"));
-        const lon = parseFloat(wpt.getAttribute("lon"));
-
-        if (!isNaN(lat) && !isNaN(lon)) {
-          let name = "";
-          const nameNode = wpt.getElementsByTagName("name")[0];
-          if (nameNode && nameNode.textContent) {
-            name = nameNode.textContent;
-          }
-
-          waypoints.push({ lat, lon, name });
-        }
-      }
-
-      // Extract track points (trkpt elements) if no waypoints found
-      if (waypoints.length === 0) {
-        const trkptNodes = gpxDoc.getElementsByTagName("trkpt");
-        for (let i = 0; i < trkptNodes.length; i++) {
-          const trkpt = trkptNodes[i];
-          const lat = parseFloat(trkpt.getAttribute("lat"));
-          const lon = parseFloat(trkpt.getAttribute("lon"));
-
-          if (!isNaN(lat) && !isNaN(lon)) {
-            waypoints.push({ lat, lon });
-          }
-        }
-      }
-
-      // Extract route points (rtept elements) if still no points found
-      if (waypoints.length === 0) {
-        const rteptNodes = gpxDoc.getElementsByTagName("rtept");
-        for (let i = 0; i < rteptNodes.length; i++) {
-          const rtept = rteptNodes[i];
-          const lat = parseFloat(rtept.getAttribute("lat"));
-          const lon = parseFloat(rtept.getAttribute("lon"));
-
-          if (!isNaN(lat) && !isNaN(lon)) {
-            waypoints.push({ lat, lon });
-          }
-        }
-      }
-
-      return waypoints;
     },
 
     // Parse KML content
@@ -1257,14 +1247,20 @@ const ROVMap = (() => {
               const coordsText = coordsNode.textContent.trim();
               const coordPairs = coordsText.split(/\s+/); // Split by whitespace
 
-              coordPairs.forEach((pair) => {
+              coordPairs.forEach((pair, idx) => {
                 const coords = pair.split(",");
                 if (coords.length >= 2) {
                   const lon = parseFloat(coords[0]);
                   const lat = parseFloat(coords[1]);
 
                   if (!isNaN(lat) && !isNaN(lon)) {
-                    waypoints.push({ lat, lon });
+                    waypoints.push({
+                      lat,
+                      lon,
+                      name: name
+                        ? `${name} (Point ${idx + 1})`
+                        : `Point ${idx + 1}`,
+                    });
                   }
                 }
               });
@@ -1276,36 +1272,60 @@ const ROVMap = (() => {
       return waypoints;
     },
 
-    addWaypointsAsTargets(waypoints) {
-      if (!waypoints || waypoints.length === 0) return;
+    populateWaypointDropdown(waypoints, fileName) {
+      const kmlFileRow = document.getElementById("kmlFileRow");
+      const kmlFileName = document.getElementById("kmlFileName");
+      const waypointSelect = document.getElementById("waypointSelect");
 
-      state.targets = [];
-      document.getElementById("addedTargetsContainer").innerHTML = "";
+      // Update file name display
+      kmlFileName.querySelector("span").textContent = fileName;
 
-      waypoints.forEach((waypoint) => {
-        const newIndex = state.targets.length;
-        state.targets.push({
-          lat: waypoint.lat,
-          lon: waypoint.lon,
-          name: waypoint.name || "", // Store the name if available
-        });
+      // Clear existing options except the default one
+      waypointSelect.innerHTML =
+        '<option value="" disabled selected>Select a waypoint</option>';
 
-        targets.createTargetEntry(newIndex);
+      // Add waypoints to the dropdown
+      waypoints.forEach((waypoint, index) => {
+        const option = document.createElement("option");
+        option.value = index;
+        const name = waypoint.name || `Waypoint ${index + 1}`;
+        option.textContent = `${name} (${waypoint.lat.toFixed(
+          6
+        )}, ${waypoint.lon.toFixed(6)})`;
+        waypointSelect.appendChild(option);
       });
 
-      state.activeTargetIndex = state.targets.length - waypoints.length;
+      // Show the KML file row
+      kmlFileRow.style.display = "block";
+    },
+
+    addSingleWaypointAsTarget(waypoint) {
+      if (!waypoint) return;
+
+      const newIndex = state.targets.length;
+      state.targets.push({
+        lat: waypoint.lat,
+        lon: waypoint.lon,
+        name: waypoint.name || "",
+      });
+
+      targets.createTargetEntry(newIndex);
+      state.activeTargetIndex = newIndex;
       render.requestDraw();
     },
 
-    // Setup event listeners for file import
-    setupGPXImport() {
-      const importBtn = document.getElementById("importGpx");
+    setupKMLImport() {
+      const importBtn = document.getElementById("importKml");
       const fileInput = document.getElementById("gpxFileInput");
+      const closeKmlFileBtn = document.getElementById("closeKmlFile");
+      const waypointSelect = document.getElementById("waypointSelect");
 
+      // Set file input to accept only KML
       if (fileInput) {
-        fileInput.accept = ".gpx,.kml";
+        fileInput.accept = ".kml";
       }
 
+      // Set up file import
       if (importBtn && fileInput) {
         importBtn.addEventListener("click", () => {
           fileInput.click();
@@ -1326,14 +1346,39 @@ const ROVMap = (() => {
               return;
             }
 
-            // Add the waypoints as targets
-            this.addWaypointsAsTargets(waypoints);
+            // Store waypoints
+            state.importedWaypoints = waypoints;
+
+            // Populate dropdown
+            this.populateWaypointDropdown(waypoints, file.name);
           } catch (error) {
             console.error(`Error importing file: ${error.message}`);
           }
 
-          // Reset the file input so the same file can be selected again
+          // Reset the file input
           fileInput.value = "";
+        });
+      }
+
+      // Set up waypoint selection
+      if (waypointSelect) {
+        waypointSelect.addEventListener("change", () => {
+          const selectedIndex = parseInt(waypointSelect.value);
+          if (!isNaN(selectedIndex) && state.importedWaypoints[selectedIndex]) {
+            this.addSingleWaypointAsTarget(
+              state.importedWaypoints[selectedIndex]
+            );
+            // Reset selection to default option
+            waypointSelect.selectedIndex = 0;
+          }
+        });
+      }
+
+      // Close KML file action
+      if (closeKmlFileBtn) {
+        closeKmlFileBtn.addEventListener("click", () => {
+          document.getElementById("kmlFileRow").style.display = "none";
+          state.importedWaypoints = [];
         });
       }
     },
@@ -1345,9 +1390,8 @@ const ROVMap = (() => {
       targets.setupNewTargetInput();
       events.setupEventListeners();
       mavlink.setupListeners();
-      gpxImport.setupGPXImport();
+      kmlImport.setupKMLImport();
       render.startAnimationLoop();
-
       helpers.resizeCanvas();
     },
   };

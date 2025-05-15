@@ -1,27 +1,25 @@
 <div id="diy-container">
     <div class="info-panel">
+        <!-- Top panel with position and controls -->
         <div class="flex-between">
             <p id="currentPos">ROV: </p>
             <div class="d-flex">
-                <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2">
-                    <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-default"></i>
-                </button>
                 <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Clear Path History">
                     <i class="mdi mdi-eraser v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
-                <button id="importGpx" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2">
+                <button id="importKml" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Import KML File">
                     <i class="mdi mdi-file-import v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
-                <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target">
+                <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target" title="Toggle Targets Panel">
                     <i class="mdi mdi-chevron-up v-icon notranslate v-theme--dark v-icon--size-default" id="targetChevron"></i>
                 </button>
-                <input type="file" id="gpxFileInput" accept=".gpx, .kml" style="display:none">
+                <input type="file" id="gpxFileInput" accept=".kml" style="display:none">
             </div>
-            
         </div>
 
+        <!-- Target container section -->
         <div id="targetContainer">
-            <!-- Persistent New Target Input -->
+            <!-- New Target Input -->
             <div id="newTargetInput" class="target-input-group">
                 <div class="v-input v-input--horizontal v-input--center-affix v-input--density-compact v-theme--light v-text-field">
                     <div class="v-input__control">
@@ -29,7 +27,7 @@
                             <div class="v-field__overlay"></div>
                             <div class="v-field__field" data-no-activator="">
                                 <label class="v-label v-field-label">New Target</label>
-                                <input type="text" class="v-field__input newTargetCoords" autocomplete="off">
+                                <input type="text" class="v-field__input newTargetCoords" autocomplete="off" placeholder="lat, lon">
                             </div>
                             <div class="v-field__outline">
                                 <div class="v-field__outline__start"></div>
@@ -45,26 +43,33 @@
                     <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>    
                 </button>
             </div>
-            <!-- Container for Added Targets -->
+            
+            <!-- Added Targets Container -->
             <div id="addedTargetsContainer"></div>
 
-            <div class="flex-between">
-                <div>
-                    <!-- <p>Clear Points</p> -->
-                </div>
-                <div class="d-flex">
-                    <button id="clearTargets" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Clear All Targets">
-                        <i class="mdi mdi-map-marker-remove v-icon notranslate v-theme--dark v-icon--size-default"></i>
+            <!-- KML File Import Section -->
+            <div id="kmlFileRow" class="kml-file-row" style="display: none; margin-top: 8px;">
+                <div class="flex-between" style="margin-bottom: 8px;">
+                    <div id="kmlFileName" class="kml-file-name" style="display: flex; align-items: center;">
+                        <i class="mdi mdi-file-document-outline v-icon notranslate v-theme--dark v-icon--size-default mr-2"></i>
+                        <span>No file selected</span>
+                    </div>
+                    <button id="closeKmlFile" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text">
+                        <i class="mdi mdi-close v-icon notranslate v-theme--dark v-icon--size-default"></i>
                     </button>
                 </div>
+                <select id="waypointSelect" class="flex items-center justify-center w-full py-1 pl-2 pr-8 text-base transition-all border-0 rounded-md shadow-inner cursor-pointer h-9 bg-slate-800/60 text-slate-100 hover:bg-slate-600/60" style="width: 100%;">
+                    <option value="" disabled selected>Select a waypoint</option>
+                </select>
             </div>
-            
         </div>
     </div>
     
-    
+    <!-- Map Container -->
     <div id="mapContainer">
         <canvas id="mapCanvas"></canvas>
+        <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-large v-btn--variant-text toggleView" title="Toggle View Mode">
+            <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-default"></i>
+        </button>
     </div>
-    
 </div>

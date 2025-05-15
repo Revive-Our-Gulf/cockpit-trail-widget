@@ -58,6 +58,9 @@ const ROVMap = (() => {
   let uiState = {
     initialPinchDistance: 0,
     lastScale: 1,
+    isDragging: false,
+    lastMousePos: { x: 0, y: 0 },
+    panOffset: { x: 0, y: 0 },
   };
 
   const helpers = {
@@ -79,8 +82,14 @@ const ROVMap = (() => {
     },
     worldToScreen(meters) {
       return {
-        x: canvas.width / 2 + helpers.metersToPixels(meters.x) * state.scale,
-        y: canvas.height / 2 + helpers.metersToPixels(meters.y) * state.scale,
+        x:
+          canvas.width / 2 +
+          (helpers.metersToPixels(meters.x) + uiState.panOffset.x) *
+            state.scale,
+        y:
+          canvas.height / 2 +
+          (helpers.metersToPixels(meters.y) + uiState.panOffset.y) *
+            state.scale,
       };
     },
     toScreenCoordinates(point, applyScale = true) {
@@ -145,9 +154,14 @@ const ROVMap = (() => {
       const x = lonMeters * CONSTANTS.BASE_SCALE;
       const y = -latMeters * CONSTANTS.BASE_SCALE;
 
+      // Include pan offset here
       return {
-        x: canvas.width / 2 + x * (applyScale ? state.scale : 1),
-        y: canvas.height / 2 + y * (applyScale ? state.scale : 1),
+        x:
+          canvas.width / 2 +
+          (x + uiState.panOffset.x) * (applyScale ? state.scale : 1),
+        y:
+          canvas.height / 2 +
+          (y + uiState.panOffset.y) * (applyScale ? state.scale : 1),
       };
     },
 
@@ -231,7 +245,6 @@ const ROVMap = (() => {
 
       const targetInput = inputGroup.querySelector(".targetCoords");
       targetInput.value = `${state.targets[index].lat}, ${state.targets[index].lon}`;
-
 
       targetInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
@@ -369,13 +382,20 @@ const ROVMap = (() => {
 
     applyViewRotation(drawingFunction) {
       ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
+      // Apply the pan offset to the center of rotation
+      ctx.translate(
+        canvas.width / 2 + uiState.panOffset.x * state.scale,
+        canvas.height / 2 + uiState.panOffset.y * state.scale
+      );
 
       if (state.viewMode === "rov-up") {
         ctx.rotate(-state.currentHeading * (Math.PI / 180));
       }
 
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.translate(
+        -(canvas.width / 2 + uiState.panOffset.x * state.scale),
+        -(canvas.height / 2 + uiState.panOffset.y * state.scale)
+      );
 
       drawingFunction();
       ctx.restore();
@@ -392,7 +412,10 @@ const ROVMap = (() => {
 
     drawROV() {
       ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.translate(
+        canvas.width / 2 + uiState.panOffset.x * state.scale,
+        canvas.height / 2 + uiState.panOffset.y * state.scale
+      );
 
       // In north-up mode, we need to rotate the ROV icon to match its heading
       if (state.viewMode === "north-up") {
@@ -625,7 +648,12 @@ const ROVMap = (() => {
 
       const target = state.targets[targetIndex];
       const scaledTarget = geoUtils.latLonToScreenPos(target);
-      const currentPixels = { x: canvas.width / 2, y: canvas.height / 2 };
+
+      // Use the actual ROV position including pan offset
+      const currentPixels = {
+        x: canvas.width / 2 + uiState.panOffset.x * state.scale,
+        y: canvas.height / 2 + uiState.panOffset.y * state.scale,
+      };
 
       const { lineEndPoint, textPosition, angle } =
         this._calculateLineEndpoints(currentPixels, scaledTarget);
@@ -983,6 +1011,36 @@ const ROVMap = (() => {
   };
 
   const events = {
+    recenterROV() {
+      uiState.panOffset = { x: 0, y: 0 };
+      render.requestDraw();
+    },
+
+    handleMouseDown(e) {
+      uiState.isDragging = true;
+      uiState.lastMousePos = { x: e.clientX, y: e.clientY };
+      canvas.style.cursor = "grabbing";
+    },
+
+    handleMouseMove(e) {
+      if (!uiState.isDragging) return;
+
+      const dx = e.clientX - uiState.lastMousePos.x;
+      const dy = e.clientY - uiState.lastMousePos.y;
+
+      // Use scale factor to make panning feel consistent across zoom levels
+      uiState.panOffset.x += dx / state.scale;
+      uiState.panOffset.y += dy / state.scale;
+
+      uiState.lastMousePos = { x: e.clientX, y: e.clientY };
+      render.requestDraw();
+    },
+
+    handleMouseUp() {
+      uiState.isDragging = false;
+      canvas.style.cursor = "grab";
+    },
+
     handleWheel(e) {
       e.preventDefault();
       const zoomFactor = 1.1;
@@ -1002,16 +1060,24 @@ const ROVMap = (() => {
 
     handleTouchStart(e) {
       if (e.touches.length === 2) {
+        // Pinch gesture handling
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         uiState.initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
         uiState.lastScale = state.scale;
+      } else if (e.touches.length === 1) {
+        // Pan gesture handling
+        uiState.isDragging = true;
+        uiState.lastMousePos = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+        };
       }
     },
 
-    // Handle touch move for pinch zooming
     handleTouchMove(e) {
       if (e.touches.length === 2) {
+        // Pinch zoom handling
         e.preventDefault();
 
         // Calculate pinch distance
@@ -1030,6 +1096,28 @@ const ROVMap = (() => {
         );
 
         render.requestDraw();
+      } else if (e.touches.length === 1 && uiState.isDragging) {
+        // Pan handling
+        e.preventDefault();
+
+        const dx = e.touches[0].clientX - uiState.lastMousePos.x;
+        const dy = e.touches[0].clientY - uiState.lastMousePos.y;
+
+        // Apply pan offset
+        uiState.panOffset.x += dx / state.scale;
+        uiState.panOffset.y += dy / state.scale;
+
+        uiState.lastMousePos = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+        };
+        render.requestDraw();
+      }
+    },
+
+    handleTouchEnd(e) {
+      if (e.touches.length === 0) {
+        uiState.isDragging = false;
       }
     },
 
@@ -1053,15 +1141,21 @@ const ROVMap = (() => {
 
     // Set up all event listeners
     setupEventListeners() {
-      // Resize handling
       window.addEventListener("resize", helpers.resizeCanvas);
-
-      // Zooming with mousewheel
       canvas.addEventListener("wheel", this.handleWheel);
 
-      // Touch events for pinch zoom
+      // Add mouse event listeners for panning
+      canvas.addEventListener("mousedown", this.handleMouseDown);
+      window.addEventListener("mousemove", this.handleMouseMove);
+      window.addEventListener("mouseup", this.handleMouseUp);
+
+      // Set initial cursor style
+      canvas.style.cursor = "grab";
+
+      // Update touch event listeners for both panning and zooming
       canvas.addEventListener("touchstart", this.handleTouchStart);
       canvas.addEventListener("touchmove", this.handleTouchMove);
+      canvas.addEventListener("touchend", this.handleTouchEnd);
 
       const targetContainer = document.getElementById("targetContainer");
       const chevronIcon = document.getElementById("targetChevron");
@@ -1107,6 +1201,11 @@ const ROVMap = (() => {
 
           render.requestDraw();
         });
+      }
+
+      const recenterBtn = document.getElementById("recenterROV");
+      if (recenterBtn) {
+        recenterBtn.addEventListener("click", this.recenterROV);
       }
     },
   };

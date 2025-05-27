@@ -19,10 +19,10 @@ const ROVMap = (() => {
     COLORS: {
       ROV: "white",
       TRAIL: "rgba(160, 0, 0, 1)",
-      ACTIVE_TARGET_ICON: "limegreen",
+      ACTIVE_TARGET_ICON: "rgba(255, 225, 0, 1)",
       INACTIVE_TARGET_ICON: "white",
       TARGET_LINE: "white",
-      DISTANCE_LINE_PRIMARY: "limegreen",
+      DISTANCE_LINE_PRIMARY: "rgba(255, 225, 0, 1)",
       DISTANCE_LINE_SECONDARY: "#999999",
       // GRID: "rgba(68, 68, 68, 0.5)",
       GRID: "rgba(100, 100, 100, 1)",
@@ -329,6 +329,7 @@ const ROVMap = (() => {
       targets.createTargetEntry(newIndex);
       state.activeTargetIndex = newIndex;
       render.requestDraw();
+      helpers.resizeCanvas();
     },
 
     setupTargetEntryListeners(inputGroup, index) {
@@ -344,6 +345,7 @@ const ROVMap = (() => {
         state.targets.splice(index, 1);
         targets.compactTargets();
         render.requestDraw();
+        helpers.resizeCanvas();
       });
     },
 
@@ -443,7 +445,7 @@ const ROVMap = (() => {
 
     applyViewRotation(drawingFunction) {
       ctx.save();
-      // Apply the pan offset to the center of rotation
+
       ctx.translate(
         canvas.width / 2 + uiState.panOffset.x * state.scale,
         canvas.height / 2 + uiState.panOffset.y * state.scale
@@ -1017,7 +1019,7 @@ const ROVMap = (() => {
           state.trail.shift();
       }
 
-      positionDisplay.innerText = `ROV: ${lat.toFixed(7)}°, ${lon.toFixed(7)}°`;
+      positionDisplay.innerText = `ROV: ${lat.toFixed(7)}, ${lon.toFixed(7)}`;
 
       this.checkTargetProximity();
 

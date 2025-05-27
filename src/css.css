@@ -27,6 +27,7 @@
     width: 100%;
     min-height: 200px;
     min-width: 200px;
+    overflow: hidden;
 }
 
 #mapCanvas {

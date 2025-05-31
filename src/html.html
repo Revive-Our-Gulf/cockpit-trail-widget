@@ -4,13 +4,16 @@
         <div class="flex-between">
             <p id="currentPos">ROV: </p>
             <div class="d-flex">
-                <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Clear Path History">
+                <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-default v-btn--variant-text" title="Toggle View Mode">
+                    <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                </button>
+                <button id="recenterROV" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-default v-btn--variant-text" title="Recenter ROV">
+                    <i class="mdi mdi-crosshairs-gps v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                </button>
+                <button id="clearTrail" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-default v-btn--variant-text" title="Clear Path History">
                     <i class="mdi mdi-eraser v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
-                <button id="importKml" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Import KML File">
-                    <i class="mdi mdi-file-import v-icon notranslate v-theme--dark v-icon--size-default"></i>
-                </button>
-                <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target" title="Toggle Targets Panel">
+                <button id="toggleTargetContainer" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-default v-btn--variant-text add-new-target" title="Toggle Targets Panel">
                     <i class="mdi mdi-chevron-up v-icon notranslate v-theme--dark v-icon--size-default" id="targetChevron"></i>
                 </button>
                 <input type="file" id="kmlFileInput" style="display: none;" accept=".kml" />
@@ -42,6 +45,9 @@
                 <button type="button" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target">
                     <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>    
                 </button>
+                <button id="importKml" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Import KML File">
+                    <i class="mdi mdi-file-import v-icon notranslate v-theme--dark v-icon--size-default"></i>
+                </button>
             </div>
 
             <!-- KML File Import Section -->
@@ -70,12 +76,7 @@
     <div id="mapContainer">
         <canvas id="mapCanvas"></canvas>
         <div class="d-flex flex-column map-controls">
-            <button id="toggleViewMode" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-large v-btn--variant-text" title="Toggle View Mode">
-                <i class="mdi mdi-compass v-icon notranslate v-theme--dark v-icon--size-large"></i>
-            </button>
-            <button id="recenterROV" class="v-btn v-btn--icon v-theme--dark v-btn--density-default v-btn--size-large v-btn--variant-text" title="Recenter ROV">
-                <i class="mdi mdi-crosshairs-gps v-icon notranslate v-theme--dark v-icon--size-large"></i>
-            </button>
+            
         </div>
     </div>
 </div>

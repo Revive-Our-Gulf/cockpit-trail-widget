@@ -87,11 +87,11 @@ const ROVMap = (() => {
         x:
           canvas.width / 2 +
           (helpers.metersToPixels(meters.x) + uiState.panOffset.x) *
-            state.scale,
+          state.scale,
         y:
           canvas.height / 2 +
           (helpers.metersToPixels(meters.y) + uiState.panOffset.y) *
-            state.scale,
+          state.scale,
       };
     },
     toScreenCoordinates(point, applyScale = true) {
@@ -184,10 +184,10 @@ const ROVMap = (() => {
       const y = Math.sin(dLon) * Math.cos(to.lat * (Math.PI / 180));
       const x =
         Math.cos(from.lat * (Math.PI / 180)) *
-          Math.sin(to.lat * (Math.PI / 180)) -
+        Math.sin(to.lat * (Math.PI / 180)) -
         Math.sin(from.lat * (Math.PI / 180)) *
-          Math.cos(to.lat * (Math.PI / 180)) *
-          Math.cos(dLon);
+        Math.cos(to.lat * (Math.PI / 180)) *
+        Math.cos(dLon);
       const bearing = Math.atan2(y, x) * (180 / Math.PI);
       return (bearing + 360) % 360;
     },
@@ -635,7 +635,7 @@ const ROVMap = (() => {
       const dy = end.y - start.y;
       const textDist = Math.sqrt(
         Math.pow(textPosition.x - start.x, 2) +
-          Math.pow(textPosition.y - start.y, 2)
+        Math.pow(textPosition.y - start.y, 2)
       );
       const totalDist = Math.sqrt(dx * dx + dy * dy);
       const dirX = dx / totalDist;
@@ -1019,7 +1019,7 @@ const ROVMap = (() => {
           state.trail.shift();
       }
 
-      positionDisplay.innerText = `ROV: ${lat.toFixed(7)}, ${lon.toFixed(7)}`;
+      positionDisplay.innerText = `${lat.toFixed(7)}, ${lon.toFixed(7)}`;
 
       this.checkTargetProximity();
 
@@ -1044,8 +1044,7 @@ const ROVMap = (() => {
 
       if (distanceToTarget <= CONSTANTS.TARGET_REACHED_THRESHOLD) {
         console.log(
-          `Target ${
-            state.activeTargetIndex + 1
+          `Target ${state.activeTargetIndex + 1
           } reached! Distance: ${distanceToTarget.toFixed(2)}m`
         );
 
@@ -1269,6 +1268,27 @@ const ROVMap = (() => {
       const recenterBtn = document.getElementById("recenterROV");
       if (recenterBtn) {
         recenterBtn.addEventListener("click", this.recenterROV);
+      }
+
+      const posDisplay = document.getElementById("currentPos");
+      if (posDisplay) {
+        posDisplay.style.cursor = "pointer";
+
+        posDisplay.addEventListener("click", () => {
+           
+          const text = posDisplay.innerText;
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          try {
+            document.execCommand('copy');
+          } catch (err) {
+            console.error('Unable to copy to clipboard', err);
+          }
+          document.body.removeChild(textArea);
+        });
       }
     },
   };

@@ -1,22 +1,110 @@
-# cockpit-trail-widget
+# ROV Trail Widget — BlueOS Extension
 
-## How to setup
-1. Go to the [Releases](https://github.com/Revive-Our-Gulf/cockpit-trail-widget/releases).
-2. Download the latest trail_widget_config.json file.
-3. Import the .json into your Cockpit interface:
-    * In Cockpit go to 'Edit Interface'
-    * Select the 'Regular' widget type in the widgets menu
-    * Add a new DIY widget
-    * At the bottom of the newly added DIY widget click 'Import'
-    * Import the .json file downloaded from the release section
+Real-time ROV position tracking with trail history, target waypoints, and KML import.
+Runs as a BlueOS Docker extension and can be iframed inside Cockpit.
 
-## How to use
-- Click <img src="./icons/file-import.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to import a .kml or .gpx.
-- Use <img src="./icons/compass.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> / <img src="./icons/navigation.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to toggle between North-up and ROV-up modes.
-- Use <img src="./icons/chevron-up.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> / <img src="./icons/chevron-down.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" />  to open and close the targets menu.
-- Click <img src="./icons/map-marker-remove.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to erase all targets.
-- Click <img src="./icons/eraser.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to clear the ROV trail.
-- In the target menu:
-    - Click <img src="./icons/target.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to set corresponding target to the current target.
-    - Click <img src="./icons/close.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to remove corresponding target.
-    - Use <img src="./icons/drag.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to reorder targets if needed.
+## Local Development
+
+**Build:**
+```bash
+docker build -t rov-trail-widget .
+```
+
+**Run:**
+```bash
+mkdir -p ./data
+docker run --rm -p 8000:8000 -v "$(pwd)/data:/data" rov-trail-widget
+```
+
+Open `http://localhost:8000`
+
+**Test trail persistence:**
+```bash
+# Save data
+curl -X POST http://localhost:8000/trail \
+  -H "Content-Type: application/json" \
+  -d '{"trail":[{"lat":51.1,"lon":-1.5}],"targets":[],"activeTargetIndex":-1}'
+
+# Retrieve (survives container restart when /data volume is mounted)
+curl http://localhost:8000/trail
+```
+
+**Check BlueOS manifest:**
+```bash
+curl http://localhost:8000/register_service
+```
+
+## BlueOS Installation (Manual)
+
+BlueOS UI → Extensions → Extension Manager → Install (manual):
+
+| Field | Value |
+|---|---|
+| Extension Identifier | `rogengineering.rov-trail-widget` |
+| Extension Name | `ROV Trail Widget` |
+| Docker Image | `<your-dockerhub-username>/rov-trail-widget` |
+| Docker Tag | `main` |
+
+**Settings JSON:**
+```json
+{
+  "ExposedPorts": { "8000/tcp": {} },
+  "HostConfig": {
+    "Binds": ["/usr/blueos/extensions/rov-trail-widget:/data"],
+    "PortBindings": { "8000/tcp": [{ "HostPort": "" }] }
+  }
+}
+```
+
+## GitHub Actions Setup
+
+Set the following in your repo (Settings → Secrets and variables → Actions):
+
+**Secrets:**
+- `DOCKER_USERNAME`
+- `DOCKER_PASSWORD`
+
+**Variables:**
+- `IMAGE_NAME` = `rov-trail-widget`
+- `BUILD_PLATFORMS` = `linux/arm64/v8,linux/amd64`
+- `MY_NAME` = your name
+- `MY_EMAIL` = your email
+- `ORG_NAME` = organisation name
+- `ORG_EMAIL` = organisation email
+
+Run the deploy workflow manually from the Actions tab.
+
+## Architecture
+
+```
+app/
+├── main.py                  Litestar backend — serves static files + trail API
+├── requirements-runtime.txt
+└── static/
+    ├── index.html           Widget UI
+    ├── js/app.js            Widget logic
+    ├── css/style.css        Styles
+    ├── icons/               SVG icons
+    └── register_service     BlueOS extension manifest
+```
+
+**API routes:**
+- `GET /` — widget UI
+- `GET /register_service` — BlueOS manifest
+- `GET /trail` — load persisted trail from `/data/trail.json`
+- `POST /trail` — save trail to `/data/trail.json`
+
+## How to Use
+
+- Click the file-import icon to import a .kml or .gpx file.
+- Use the compass / navigation icon to toggle between North-up and ROV-up modes.
+- Use the chevron to open and close the targets panel.
+- In the target panel:
+    - Click the target icon to set a target as the active target.
+    - Click the X icon to remove a target.
+    - Drag to reorder targets.
+
+## Roadmap
+
+- **PR 2** — Replace `window.cockpit` with MAVLink2Rest REST polling + wire trail auto-save
+- **PR 3** — Replace canvas rendering with Leaflet.js (transparent, no tiles)

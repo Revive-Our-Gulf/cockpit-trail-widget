@@ -1,0 +1,59 @@
+name: Deploy BlueOS Extension Image
+
+on:
+  # Automatically run when a new commit is added to the repository
+  #push:
+  # Automatically run when someone makes a Pull Request to the repository
+  #pull_request:
+  # Run manually
+  workflow_dispatch:
+  # NOTE: caches may be removed if not run weekly
+  #  -> may be worth scheduling for every 6 days
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  deploy-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup old image artifacts
+        uses: actions/github-script@v7
+        env:
+          IMAGE_NAME: ${{ vars.IMAGE_NAME || 'rov-trail-widget' }}
+        with:
+          script: |
+            const prefix = `blueos-${process.env.IMAGE_NAME}-docker-image-`;
+            const { owner, repo } = context.repo;
+
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            const targets = artifacts.filter((artifact) => artifact.name.startsWith(prefix));
+
+            core.info(`Found ${targets.length} artifact(s) matching '${prefix}'`);
+            for (const artifact of targets) {
+              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner,
+                repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+      - name: Deploy BlueOS Extension
+        uses: BlueOS-community/Deploy-BlueOS-Extension@v1
+        with:
+          docker-username: ${{ secrets.DOCKER_USERNAME }}
+          docker-password: ${{ secrets.DOCKER_PASSWORD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          build-platforms: ${{ vars.BUILD_PLATFORMS || 'linux/arm64/v8,linux/amd64' }}
+          image-name: ${{ vars.IMAGE_NAME || 'rov-trail-widget' }}
+          author: ${{ vars.MY_NAME }}
+          author-email: ${{ vars.MY_EMAIL }}
+          maintainer: ${{ vars.ORG_NAME }}
+          maintainer-email: ${{ vars.ORG_EMAIL }}

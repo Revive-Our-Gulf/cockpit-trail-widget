@@ -1,3 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROV Trail Widget</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
 <div id="diy-container">
     <div class="info-panel">
         <!-- Top panel with position and controls -->
@@ -43,7 +52,7 @@
                     </div>
                 </div>
                 <button type="button" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text add-new-target">
-                    <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>    
+                    <i class="mdi-plus mdi v-icon notranslate v-theme--dark v-icon--size-default"></i>
                 </button>
                 <button id="importKml" class="v-btn v-btn--icon v-theme--dark v-btn--density-compact v-btn--size-default v-btn--variant-text mr-2" title="Import KML File">
                     <i class="mdi mdi-file-import v-icon notranslate v-theme--dark v-icon--size-default"></i>
@@ -61,22 +70,23 @@
                         <i class="mdi mdi-trash-can v-icon notranslate v-theme--dark v-icon--size-default"></i>
                     </button>
                 </div>
-                <select id="waypointSelect" class="flex items-center justify-center w-full py-1 pl-2 pr-8 text-base transition-all border-0 rounded-md shadow-inner cursor-pointer h-9 bg-slate-800/60 text-slate-100 hover:bg-slate-600/60" style="width: 100%;">
+                <select id="waypointSelect" style="width: 100%;">
                     <option value="" disabled selected>Select a waypoint</option>
                 </select>
             </div>
 
             <!-- Added Targets Container -->
             <div id="addedTargetsContainer"></div>
-            
+
         </div>
     </div>
-    
+
     <!-- Map Container -->
     <div id="mapContainer">
         <canvas id="mapCanvas"></canvas>
-        <div class="d-flex flex-column map-controls">
-            
-        </div>
+        <div class="d-flex flex-column map-controls"></div>
     </div>
 </div>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

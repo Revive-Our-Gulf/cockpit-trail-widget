@@ -1,9 +1,11 @@
 import json
 import logging.handlers
 import os
+import subprocess
 from pathlib import Path
 
 from litestar import Litestar, MediaType, Request, get, post
+from litestar.datastructures import CacheControlHeader
 from litestar.logging import LoggingConfig
 from litestar.static_files import create_static_files_router
 
@@ -16,9 +18,32 @@ TRAIL_FILE = DATA_DIR / "trail.json"
 EMPTY_TRAIL: dict = {"trail": [], "targets": [], "activeTargetIndex": -1}
 
 
-@get("/", media_type=MediaType.HTML, sync_to_thread=True)
+_NO_CACHE = CacheControlHeader(no_store=True)
+
+
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=APP_ROOT,
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+
+_SHA_DIV = (
+    '<div style="position:fixed;bottom:4px;right:8px;'
+    'font-size:11px;font-family:monospace;color:rgba(255,255,255,0.45);'
+    'z-index:9999;pointer-events:none;user-select:none">'
+    f"sha:{_git_sha()}"
+    "</div>"
+)
+
+
+@get("/", media_type=MediaType.HTML, sync_to_thread=True, cache_control=_NO_CACHE)
 def index() -> str:
-    return INDEX_FILE.read_text(encoding="utf-8")
+    return INDEX_FILE.read_text(encoding="utf-8").replace("{{BUILD_SHA}}", _SHA_DIV)
 
 
 @get("/register_service", media_type=MediaType.TEXT, sync_to_thread=True)
@@ -52,7 +77,8 @@ fh = logging.handlers.RotatingFileHandler(
 )
 
 static_router = create_static_files_router(
-    path="/static", directories=[str(APP_ROOT / "static")]
+    path="/static", directories=[str(APP_ROOT / "static")],
+    cache_control=_NO_CACHE,
 )
 
 app = Litestar(

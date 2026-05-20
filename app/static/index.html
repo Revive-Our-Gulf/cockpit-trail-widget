@@ -3,9 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store">
+    <meta http-equiv="Pragma" content="no-cache">
     <title>ROV Trail Widget</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7/css/materialdesignicons.min.css">
+    <style>
+        @font-face {
+            font-family: 'Roboto';
+            src: url('static/fonts/Roboto-Regular.woff2') format('woff2');
+            font-weight: 400;
+            font-style: normal;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Roboto', sans-serif;
+        }
+        :root {
+            --v-font-family: 'Roboto', sans-serif;
+        }
+        #diy-container {
+            height: 100vh;
+        }
+    </style>
+    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="static/css/materialdesignicons.min.css">
 </head>
 <body>
 <div id="diy-container">
@@ -88,6 +111,7 @@
         <div class="d-flex flex-column map-controls"></div>
     </div>
 </div>
-<script src="/static/js/app.js"></script>
+{{BUILD_SHA}}
+<script src="static/js/app.js"></script>
 </body>
 </html>

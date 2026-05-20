@@ -1063,6 +1063,7 @@ const ROVMap = (() => {
     },
 
     setupListeners() {
+      if (!window.cockpit) return;
       window.cockpit.listenDataLakeVariable(
         MAVLINK_VARS.LAT,
         this.handleLatitude

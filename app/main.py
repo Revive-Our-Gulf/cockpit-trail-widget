@@ -1,13 +1,14 @@
 import json
 import logging.handlers
+import os
 from pathlib import Path
 
 from litestar import Litestar, MediaType, Request, get, post
 from litestar.logging import LoggingConfig
 from litestar.static_files import create_static_files_router
 
-APP_ROOT = Path("/app")
-DATA_DIR = Path("/data")
+APP_ROOT = Path(__file__).parent
+DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 INDEX_FILE = APP_ROOT / "static" / "index.html"
 REGISTER_SERVICE_FILE = APP_ROOT / "static" / "register_service"
 TRAIL_FILE = DATA_DIR / "trail.json"

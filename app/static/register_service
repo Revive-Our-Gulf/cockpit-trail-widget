@@ -1,0 +1,11 @@
+{
+    "name": "ROV Trail Widget",
+    "description": "Real-time ROV position tracking with trail and waypoint management",
+    "icon": "mdi-map-marker-path",
+    "company": "ROG Engineering",
+    "version": "0.1.0",
+    "webpage": "/",
+    "new_page": true,
+    "works_in_relative_paths": true,
+    "api": "/trail"
+}

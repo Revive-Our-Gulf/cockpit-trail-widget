@@ -1,3 +1,9 @@
+// TODO PR 2: Replace window.cockpit listeners (setupListeners, ~line 1060) with
+// MAVLink2Rest REST polling:
+//   GET /mavlink2rest/mavlink/vehicles/1/components/1/messages/GLOBAL_POSITION_INT
+//   Scaling: message.lat / 1e7, message.lon / 1e7, message.hdg / 100
+// Also wire GET /trail on load and POST /trail (debounced) on each position update.
+
 const ROVMap = (() => {
   const canvas = document.getElementById("mapCanvas");
   const ctx = canvas.getContext("2d");
@@ -1057,6 +1063,7 @@ const ROVMap = (() => {
     },
 
     setupListeners() {
+      if (!window.cockpit) return;
       window.cockpit.listenDataLakeVariable(
         MAVLINK_VARS.LAT,
         this.handleLatitude

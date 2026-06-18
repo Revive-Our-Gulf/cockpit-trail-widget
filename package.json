@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "build:widget": "node scripts/build-widget.mjs",
-    "verify": "npm run test && npm run build:widget"
+    "run-locally": "node scripts/serve-local.mjs",
+    "generate-json": "node scripts/build-widget.mjs",
+    "unit-test:all-files": "vitest run",
+    "unit-test:current-file": "vitest run",
+    "verify": "npm run unit-test:all-files && npm run generate-json"
   },
   "devDependencies": {
     "clean-css": "^5.3.3",

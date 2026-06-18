@@ -29,6 +29,12 @@ BlueOS DIY widgets need one HTML, one CSS, and one JS blob. This repo now suppor
 2. Unit test those modules with Vitest.
 3. Build BlueOS-ready single-file snippets and a generated widget config JSON.
 
+Current widget source files are:
+
+- `src/widget.html`
+- `src/widget.css`
+- `src/main.js`
+
 ### Install dependencies
 
 ```bash
@@ -38,13 +44,27 @@ npm install
 ### Run tests
 
 ```bash
-npm test
+npm run unit-test:all-files
 ```
+
+Run tests for only one file:
+
+```bash
+npm run unit-test:current-file -- test/unit/geo.test.js
+```
+
+### Run local preview (with mocked datalake)
+
+```bash
+npm run run-locally
+```
+
+Then open http://localhost:5173.
 
 ### Build BlueOS outputs
 
 ```bash
-npm run build:widget
+npm run generate-json
 ```
 
 Outputs are written to `dist/`:
@@ -58,6 +78,6 @@ Outputs are written to `dist/`:
 The build script supports both modes:
 
 - If `src/main.js` exists, it bundles modules with esbuild into one JS output.
-- Otherwise it uses `src/js.js` directly as the JS source.
+- Otherwise it uses `src/widget.js` directly as the JS source.
 
 This lets you migrate from a monolithic script to module files gradually without breaking releases.

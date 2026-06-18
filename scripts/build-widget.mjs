@@ -18,7 +18,7 @@ async function readText(filePath) {
 
 async function bundleJs() {
   const moduleEntry = path.join(SRC_DIR, "main.js");
-  const legacyEntry = path.join(SRC_DIR, "js.js");
+  const legacyEntry = path.join(SRC_DIR, "widget.js");
 
   try {
     await fs.access(moduleEntry);
@@ -38,8 +38,8 @@ async function bundleJs() {
 }
 
 async function buildSnippets() {
-  const htmlSource = await readText(path.join(SRC_DIR, "html.html"));
-  const cssSource = await readText(path.join(SRC_DIR, "css.css"));
+  const htmlSource = await readText(path.join(SRC_DIR, "widget.html"));
+  const cssSource = await readText(path.join(SRC_DIR, "widget.css"));
   const jsSource = await bundleJs();
 
   const html = await minifyHtml(htmlSource, {

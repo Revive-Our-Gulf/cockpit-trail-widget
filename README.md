@@ -53,14 +53,6 @@ Run tests for only one file:
 npm run unit-test:current-file -- test/unit/geo.test.js
 ```
 
-### Run local preview (with mocked datalake)
-
-```bash
-npm run run-locally
-```
-
-Then open http://localhost:5173.
-
 ### Build BlueOS outputs
 
 ```bash

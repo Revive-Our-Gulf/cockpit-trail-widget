@@ -2,13 +2,6 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "run locally",
-      "type": "npm",
-      "script": "run-locally",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
       "label": "generate json",
       "type": "npm",
       "script": "generate-json",

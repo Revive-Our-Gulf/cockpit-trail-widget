@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "run-locally": "node scripts/serve-local.mjs",
     "generate-json": "node scripts/build-widget.mjs",
     "unit-test:all-files": "vitest run",
     "unit-test:current-file": "vitest run",

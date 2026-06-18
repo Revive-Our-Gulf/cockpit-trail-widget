@@ -20,3 +20,44 @@
     - Click <img src="./icons/target.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to set corresponding target to the current target.
     - Click <img src="./icons/close.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to remove corresponding target.
     - Use <img src="./icons/drag.svg" width="16" height="16" style="vertical-align: middle; background: white; border-radius: 50%;" /> to reorder targets if needed.
+
+## Developer workflow (modular + testable + BlueOS export)
+
+BlueOS DIY widgets need one HTML, one CSS, and one JS blob. This repo now supports a split workflow:
+
+1. Write reusable logic in normal module files (example: `src/lib/geo.js`).
+2. Unit test those modules with Vitest.
+3. Build BlueOS-ready single-file snippets and a generated widget config JSON.
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Run tests
+
+```bash
+npm test
+```
+
+### Build BlueOS outputs
+
+```bash
+npm run build:widget
+```
+
+Outputs are written to `dist/`:
+
+- `dist/widget-snippets.json` (single HTML/CSS/JS strings)
+- `dist/cockpit-trail-widget-config.generated.json` (ready to import into Cockpit)
+- `dist/blueos-copy-paste.md` (copy/paste-friendly snippets)
+
+### Optional module-first JS entry
+
+The build script supports both modes:
+
+- If `src/main.js` exists, it bundles modules with esbuild into one JS output.
+- Otherwise it uses `src/js.js` directly as the JS source.
+
+This lets you migrate from a monolithic script to module files gradually without breaking releases.

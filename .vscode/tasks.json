@@ -7,7 +7,7 @@
       "script": "generate-json",
       "group": "build",
       "problemMatcher": []
-    },
+  },
     {
       "label": "unit test: all files",
       "type": "npm",

@@ -12,37 +12,33 @@
   var state = {
     lat: null,
     lon: null,
-    heading: null
+    heading: 0
   };
   var map;
-  var rovTriangle;
+  var rovMarker;
+  var rovIcon;
 
   function setStatus(message) {
     var statusEl = document.getElementById(STATUS_ID);
     if (statusEl) statusEl.textContent = message;
   }
 
-  function offsetLatLon(lat, lon, headingDeg, distanceMeters) {
-    var rad = (headingDeg * Math.PI) / 180;
-    var dLat = (distanceMeters * Math.cos(rad)) / 111320;
-    var cosLat = Math.cos((lat * Math.PI) / 180) || 1e-9;
-    var dLon = (distanceMeters * Math.sin(rad)) / (111320 * cosLat);
-    return [lat + dLat, lon + dLon];
-  }
-
-  function getTrianglePoints(lat, lon, headingDeg) {
-    var tip = offsetLatLon(lat, lon, headingDeg, 4.0);
-    var backLeft = offsetLatLon(lat, lon, headingDeg - 150, 2.8);
-    var backRight = offsetLatLon(lat, lon, headingDeg + 150, 2.8);
-    return [tip, backLeft, backRight];
-  }
-
-  function updateRovIcon() {
-    if (!rovTriangle) return;
+  function updateRovMarker() {
     if (state.lat === null || state.lon === null) return;
+    var latLng = [state.lat, state.lon];
+    if (rovMarker) {
+      rovMarker.setLatLng(latLng);
+    } else {
+      rovMarker = window.L.marker(latLng, { icon: rovIcon }).addTo(map);
+    }
 
-    var heading = state.heading === null ? 0 : state.heading;
-    rovTriangle.setLatLngs(getTrianglePoints(state.lat, state.lon, heading));
+    var markerElement = rovMarker.getElement();
+    if (!markerElement) return;
+
+    var markerInner = markerElement.querySelector(".rov-marker");
+    if (markerInner) {
+      markerInner.style.transform = "rotate(" + state.heading + "deg)";
+    }
   }
 
   function updateDebugStatus() {
@@ -50,7 +46,6 @@
     var mapLon = "n/a";
     var rovLat = "n/a";
     var rovLon = "n/a";
-    var rovHdg = "n/a";
 
     if (map) {
       var center = map.getCenter();
@@ -63,14 +58,9 @@
       rovLon = state.lon.toFixed(6);
     }
 
-    if (state.heading !== null) {
-      rovHdg = state.heading.toFixed(1);
-    }
-
     setStatus(
       "Map: " + mapLat + ", " + mapLon + "\n" +
-      "ROV: " + rovLat + ", " + rovLon + "\n" +
-      "HDG: " + rovHdg
+      "ROV: " + rovLat + ", " + rovLon
     );
   }
 
@@ -90,7 +80,7 @@
     var raw = window.cockpit.getDataLakeVariableData(MAVLINK_VARS.LAT);
     if (raw === undefined || raw === null) return;
     state.lat = raw / 1e7;
-    updateRovIcon();
+    updateRovMarker();
     updateDebugStatus();
   }
 
@@ -98,7 +88,7 @@
     var raw = window.cockpit.getDataLakeVariableData(MAVLINK_VARS.LON);
     if (raw === undefined || raw === null) return;
     state.lon = raw / 1e7;
-    updateRovIcon();
+    updateRovMarker();
     updateDebugStatus();
   }
 
@@ -106,8 +96,7 @@
     var raw = window.cockpit.getDataLakeVariableData(MAVLINK_VARS.HDG);
     if (raw === undefined || raw === null) return;
     state.heading = raw / 100;
-    updateRovIcon();
-    updateDebugStatus();
+    updateRovMarker();
   }
 
   function setupRovListeners() {
@@ -138,20 +127,19 @@
     if (mapContainer.dataset.mapReady === "1") return;
     mapContainer.dataset.mapReady = "1";
 
+    rovIcon = window.L.divIcon({
+      className: "",
+      html: "<div class='rov-marker'></div>",
+      iconSize: [14, 20],
+      iconAnchor: [7, 13]
+    });
+
     map = window.L.map(MAP_ID, {
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
       zoomControl: true,
-      attributionControl: false,
-      worldCopyJump: true
+      attributionControl: false
     });
-
-    rovTriangle = window.L.polygon(getTrianglePoints(DEFAULT_CENTER[0], DEFAULT_CENTER[1], 0), {
-      color: "#22d3ee",
-      weight: 1,
-      fillColor: "#22d3ee",
-      fillOpacity: 0.9
-    }).addTo(map);
 
     var centerButton = document.getElementById(CENTER_BUTTON_ID);
     if (centerButton) {

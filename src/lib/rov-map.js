@@ -4,10 +4,10 @@ export function createRovMap(options) {
   var leaflet = options.leaflet;
   var doc = options.document;
   var mapId = options.mapId;
-  var statusId = options.statusId;
   var centerButtonId = options.centerButtonId;
   var defaultCenter = options.defaultCenter;
   var defaultZoom = options.defaultZoom;
+  var onStateChange = options.onStateChange;
 
   var state = {
     lat: null,
@@ -17,12 +17,33 @@ export function createRovMap(options) {
   var map;
   var rovMarker;
   var rovIcon;
-  var statusElement;
 
-  function setStatus(message) {
-    if (statusElement) {
-      statusElement.textContent = message;
+  function emitStateChange() {
+    if (!onStateChange) return;
+
+    var mapState = {
+      lat: null,
+      lon: null,
+      zoom: null,
+    };
+
+    if (map) {
+      var center = map.getCenter();
+      mapState = {
+        lat: center.lat,
+        lon: center.lng,
+        zoom: map.getZoom(),
+      };
     }
+
+    onStateChange({
+      map: mapState,
+      rov: {
+        lat: state.lat,
+        lon: state.lon,
+        heading: state.heading,
+      },
+    });
   }
 
   function updateRovMarker() {
@@ -44,29 +65,6 @@ export function createRovMap(options) {
     }
   }
 
-  function updateStatus() {
-    var mapLat = "n/a";
-    var mapLon = "n/a";
-    var rovLat = "n/a";
-    var rovLon = "n/a";
-
-    if (map) {
-      var center = map.getCenter();
-      mapLat = center.lat.toFixed(6);
-      mapLon = center.lng.toFixed(6);
-    }
-
-    if (state.lat !== null && state.lon !== null) {
-      rovLat = state.lat.toFixed(6);
-      rovLon = state.lon.toFixed(6);
-    }
-
-    setStatus(
-      "Map: " + mapLat + ", " + mapLon + "\n" +
-      "ROV: " + rovLat + ", " + rovLon
-    );
-  }
-
   function centerOnRov() {
     if (!map) return;
     if (state.lat === null || state.lon === null) return;
@@ -80,20 +78,19 @@ export function createRovMap(options) {
     };
 
     updateRovMarker();
-    updateStatus();
+    emitStateChange();
   }
 
   function init() {
     var mapContainer = doc.getElementById(mapId);
-    statusElement = doc.getElementById(statusId);
 
     if (!mapContainer) {
-      setStatus("Map container missing");
+      emitStateChange();
       return false;
     }
 
     if (!leaflet || !leaflet.map) {
-      setStatus("Leaflet global not found (window.L)");
+      emitStateChange();
       return false;
     }
 
@@ -120,12 +117,12 @@ export function createRovMap(options) {
       centerButton.onclick = centerOnRov;
     }
 
-    map.on("move zoom", updateStatus);
-    updateStatus();
+    map.on("move zoom", emitStateChange);
+    emitStateChange();
 
     setTimeout(function () {
       map.invalidateSize();
-      updateStatus();
+      emitStateChange();
     }, 0);
 
     return true;

@@ -73,30 +73,6 @@ async function writeBlueOsConfig(snippets) {
   await fs.writeFile(configOutPath, JSON.stringify(config, null, 2) + "\n", "utf8");
 }
 
-async function writeCopyPasteGuide(snippets) {
-  const markdown = [
-    "# BlueOS DIY Widget Copy/Paste",
-    "",
-    "## HTML",
-    "```html",
-    snippets.html,
-    "```",
-    "",
-    "## CSS",
-    "```css",
-    snippets.css,
-    "```",
-    "",
-    "## JS",
-    "```javascript",
-    snippets.js,
-    "```",
-    "",
-  ].join("\n");
-
-  await fs.writeFile(path.join(DIST_DIR, "blueos-copy-paste.md"), markdown, "utf8");
-}
-
 async function main() {
   await fs.mkdir(DIST_DIR, { recursive: true });
   const snippets = await buildSnippets();
@@ -108,7 +84,6 @@ async function main() {
   );
 
   await writeBlueOsConfig(snippets);
-  await writeCopyPasteGuide(snippets);
 
   console.log("Built BlueOS snippets and generated config in dist/");
 }

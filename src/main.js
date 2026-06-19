@@ -12,6 +12,7 @@ import { createRovMap } from "./lib/rov-map.js";
     var debugPanel = createDebugPanel({
       element: document.getElementById("map-status"),
       buildInfo: buildInfo,
+      hertz: 16,
     });
     window.debug = debugPanel;
 
@@ -21,7 +22,7 @@ import { createRovMap } from "./lib/rov-map.js";
       mapId: "leaflet-map",
       centerButtonId: "center-rov",
       defaultCenter: [0, 0],
-      defaultZoom: 3,
+      defaultZoom: 12,
       onStateChange: function (nextState) {
         debugPanel.setMapState(nextState.map);
         debugPanel.setRovState(nextState.rov);

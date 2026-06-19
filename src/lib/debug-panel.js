@@ -51,16 +51,32 @@ function renderLines(state) {
 export function createDebugPanel(options) {
   var element = options.element;
   var maxLogs = options.maxLogs || 10;
+  var hertz = options.hertz;
   var state = createInitialState(options.buildInfo || {});
   var scheduledFrame = null;
+  var scheduledTimeout = null;
+  var frameInterval = typeof hertz === "number" && hertz > 0 ? 1000 / hertz : 0;
+  var lastRenderAt = 0;
 
   function renderNow() {
     if (!element) return;
+    lastRenderAt = Date.now();
     element.textContent = renderLines(state).join("\n");
   }
 
   function scheduleRender() {
-    if (scheduledFrame !== null) {
+    if (scheduledFrame !== null || scheduledTimeout !== null) {
+      return;
+    }
+
+    if (frameInterval > 0) {
+      var now = Date.now();
+      var waitMs = Math.max(0, frameInterval - (now - lastRenderAt));
+
+      scheduledTimeout = setTimeout(function () {
+        scheduledTimeout = null;
+        renderNow();
+      }, waitMs);
       return;
     }
 
@@ -79,6 +95,11 @@ export function createDebugPanel(options) {
     if (scheduledFrame !== null && typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(scheduledFrame);
       scheduledFrame = null;
+    }
+
+    if (scheduledTimeout !== null) {
+      clearTimeout(scheduledTimeout);
+      scheduledTimeout = null;
     }
 
     renderNow();

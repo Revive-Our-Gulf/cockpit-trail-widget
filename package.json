@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate-json": "node build/build-widget.mjs",
+    "generate-json": "node scripts/build/build-widget.mjs",
     "unit-test:all-files": "vitest run",
     "unit-test:current-file": "vitest run",
     "verify": "npm run unit-test:all-files && npm run generate-json"

@@ -17,6 +17,14 @@
 
 #top-bar {
   grid-area: top;
+  display: flex;
+  justify-content: flex-start;
+}
+
+#top-bar-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #panel {

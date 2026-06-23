@@ -1,4 +1,5 @@
 import { createRovIcon } from "./map-icons.js";
+import { createRovTrail } from "./rov-trail.js";
 
 export function createRovMap(options) {
   var leaflet = options.leaflet;
@@ -8,6 +9,8 @@ export function createRovMap(options) {
   var defaultCenter = options.defaultCenter;
   var defaultZoom = options.defaultZoom;
   var onStateChange = options.onStateChange;
+  var trailMaxPoints = options.trailMaxPoints || 30;
+  var trailMinDistanceMeters = options.trailMinDistanceMeters || 0.5;
 
   var state = {
     lat: null,
@@ -17,6 +20,8 @@ export function createRovMap(options) {
   var map;
   var rovMarker;
   var rovIcon;
+  var rovTrail;
+  var isFollowingRov = true;
 
   function emitStateChange() {
     if (!onStateChange) return;
@@ -46,7 +51,7 @@ export function createRovMap(options) {
     });
   }
 
-  function updateRovMarker() {
+  function updateRovMarker(positionChanged) {
     if (!map || state.lat === null || state.lon === null) return;
 
     var latLng = [state.lat, state.lon];
@@ -63,21 +68,39 @@ export function createRovMap(options) {
     if (markerInner) {
       markerInner.style.transform = "rotate(" + state.heading + "deg)";
     }
+
+    if (positionChanged && rovTrail) {
+      rovTrail.appendPoint({ lat: state.lat, lon: state.lon });
+    }
+
+    if (positionChanged && isFollowingRov) {
+      centerOnRov();
+    }
   }
 
   function centerOnRov() {
     if (!map) return;
+    isFollowingRov = true;
     if (state.lat === null || state.lon === null) return;
     map.setView([state.lat, state.lon], map.getZoom(), { animate: false });
   }
 
+  function handleDragStart() {
+    isFollowingRov = false;
+    emitStateChange();
+  }
+
   function setRovState(update) {
+    var previousState = state;
     state = {
       ...state,
       ...update,
     };
 
-    updateRovMarker();
+    var positionChanged =
+      state.lat !== previousState.lat || state.lon !== previousState.lon;
+
+    updateRovMarker(positionChanged);
     emitStateChange();
   }
 
@@ -104,6 +127,11 @@ export function createRovMap(options) {
 
     mapContainer.dataset.mapReady = "1";
     rovIcon = createRovIcon(leaflet);
+    rovTrail = createRovTrail({
+      leaflet: leaflet,
+      maxPoints: trailMaxPoints,
+      minSegmentDistanceMeters: trailMinDistanceMeters,
+    });
 
     map = leaflet.map(mapId, {
       center: defaultCenter,
@@ -111,12 +139,14 @@ export function createRovMap(options) {
       zoomControl: true,
       attributionControl: false,
     });
+    rovTrail.addTo(map);
 
     var centerButton = doc.getElementById(centerButtonId);
     if (centerButton) {
       centerButton.onclick = centerOnRov;
     }
 
+    map.on("dragstart", handleDragStart);
     map.on("move zoom", emitStateChange);
     emitStateChange();
 

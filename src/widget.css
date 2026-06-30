@@ -64,12 +64,21 @@
   white-space: pre-line;
 }
 
-.rov-marker {
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-bottom: 20px solid #22d3ee;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
-  transform-origin: center 13px;
+.rov-marker-shell {
+  background: none !important;
+  border: none !important;
+}
+
+.rov-marker__inner {
+  width: 40px;
+  height: 40px;
+  transform-origin: 20px 20px;
+  will-change: transform;
+}
+
+.rov-marker__svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }

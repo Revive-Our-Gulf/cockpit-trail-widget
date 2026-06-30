@@ -19,7 +19,7 @@ function createLeafletStub() {
   var markerInner = { style: {} };
   var markerElement = {
     querySelector(selector) {
-      if (selector === ".rov-marker") {
+      if (selector === ".rov-marker__inner") {
         return markerInner;
       }
 
@@ -161,9 +161,7 @@ describe("createRovMap", () => {
     expect(leafletStub.leaflet.layerGroups[0].layers).toHaveLength(1);
     expect(
       leafletStub.leaflet.layerGroups[0].layers[0].options.opacity
-    ).toBeCloseTo(
-      0.85
-    );
+    ).toBeGreaterThan(0.99);
 
     vi.runAllTimers();
     expect(leafletStub.map.didInvalidateSize).toBe(true);

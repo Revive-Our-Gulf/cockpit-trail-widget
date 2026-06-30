@@ -9,8 +9,9 @@ export function createRovMap(options) {
   var defaultCenter = options.defaultCenter;
   var defaultZoom = options.defaultZoom;
   var onStateChange = options.onStateChange;
-  var trailMaxPoints = options.trailMaxPoints || 30;
-  var trailMinDistanceMeters = options.trailMinDistanceMeters || 0.5;
+  var trailMaxPoints = options.trailMaxPoints;
+  var trailMaxDistanceMeters = options.trailMaxDistanceMeters || 200;
+  var trailMinDistanceMeters = options.trailMinDistanceMeters || 1;
 
   var state = {
     lat: null,
@@ -64,7 +65,7 @@ export function createRovMap(options) {
     var markerElement = rovMarker.getElement();
     if (!markerElement) return;
 
-    var markerInner = markerElement.querySelector(".rov-marker");
+    var markerInner = markerElement.querySelector(".rov-marker__inner");
     if (markerInner) {
       markerInner.style.transform = "rotate(" + state.heading + "deg)";
     }
@@ -130,6 +131,7 @@ export function createRovMap(options) {
     rovTrail = createRovTrail({
       leaflet: leaflet,
       maxPoints: trailMaxPoints,
+      maxDistanceMeters: trailMaxDistanceMeters,
       minSegmentDistanceMeters: trailMinDistanceMeters,
     });
 

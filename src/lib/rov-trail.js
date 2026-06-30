@@ -8,16 +8,35 @@ function distanceInMeters(firstPoint, secondPoint) {
   return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
 }
 
+function clamp(value, minValue, maxValue) {
+  return Math.min(maxValue, Math.max(minValue, value));
+}
+
 export function createRovTrail(options) {
   var leaflet = options.leaflet;
-  var color = options.color || "#22d3ee";
+  var color = options.color || "#a00000";
   var weight = options.weight || 4;
-  var maxPoints = options.maxPoints || 30;
-  var minSegmentDistanceMeters = options.minSegmentDistanceMeters || 0.5;
+  var maxDistanceMeters = options.maxDistanceMeters || 200;
+  var minSegmentDistanceMeters = options.minSegmentDistanceMeters || 1;
+  var maxPoints =
+    options.maxPoints ||
+    Math.ceil(maxDistanceMeters / minSegmentDistanceMeters) + 1;
   var minOpacity = options.minOpacity || 0.15;
-  var maxOpacity = options.maxOpacity || 0.85;
+  var maxOpacity = options.maxOpacity || 1;
   var points = [];
   var layerGroup = leaflet.layerGroup();
+  var totalDistanceMeters = 0;
+
+  function trimToBudget() {
+    while (
+      points.length > 1 &&
+      (points.length > maxPoints || totalDistanceMeters > maxDistanceMeters)
+    ) {
+      totalDistanceMeters -= points[1].segmentDistanceMeters;
+      points.shift();
+      points[0].segmentDistanceMeters = 0;
+    }
+  }
 
   function redraw() {
     layerGroup.clearLayers();
@@ -26,16 +45,34 @@ export function createRovTrail(options) {
       return;
     }
 
-    var segmentCount = points.length - 1;
-    for (var index = 1; index < points.length; index += 1) {
-      var ratio = segmentCount === 1 ? 1 : index / segmentCount;
-      var opacity = minOpacity + (maxOpacity - minOpacity) * ratio;
+    var distanceFromNewestMeters = 0;
+    for (var index = points.length - 1; index >= 1; index -= 1) {
+      var currentPoint = points[index];
+      var previousPoint = points[index - 1];
+      var midpointDistanceMeters =
+        distanceFromNewestMeters + currentPoint.segmentDistanceMeters / 2;
+      var distanceRatio = clamp(
+        midpointDistanceMeters / maxDistanceMeters,
+        0,
+        1
+      );
+      var opacity =
+        minOpacity + (maxOpacity - minOpacity) * (1 - distanceRatio);
+
+      distanceFromNewestMeters += currentPoint.segmentDistanceMeters;
+
       layerGroup.addLayer(
-        leaflet.polyline([points[index - 1], points[index]], {
+        leaflet.polyline(
+          [
+            [previousPoint.lat, previousPoint.lon],
+            [currentPoint.lat, currentPoint.lon],
+          ],
+          {
           color: color,
           weight: weight,
           opacity: opacity,
-        })
+          }
+        )
       );
     }
   }
@@ -46,24 +83,37 @@ export function createRovTrail(options) {
     }
 
     var previousPoint = points[points.length - 1];
-    if (
-      previousPoint &&
-      distanceInMeters(point, previousPoint) < minSegmentDistanceMeters
-    ) {
+    if (!previousPoint) {
+      points.push({
+        lat: point.lat,
+        lon: point.lon,
+        segmentDistanceMeters: 0,
+      });
+      redraw();
+      return true;
+    }
+
+    var segmentDistanceMeters = distanceInMeters(previousPoint, point);
+    if (segmentDistanceMeters < minSegmentDistanceMeters) {
       return false;
     }
 
-    points.push([point.lat, point.lon]);
-    if (points.length > maxPoints) {
-      points.shift();
-    }
+    points.push({
+      lat: point.lat,
+      lon: point.lon,
+      segmentDistanceMeters: segmentDistanceMeters,
+    });
+    totalDistanceMeters += segmentDistanceMeters;
+    trimToBudget();
 
     redraw();
+
     return true;
   }
 
   function clear() {
     points = [];
+    totalDistanceMeters = 0;
     redraw();
   }
 
@@ -74,7 +124,9 @@ export function createRovTrail(options) {
   }
 
   function getPoints() {
-    return points.slice();
+    return points.map(function (point) {
+      return [point.lat, point.lon];
+    });
   }
 
   return {

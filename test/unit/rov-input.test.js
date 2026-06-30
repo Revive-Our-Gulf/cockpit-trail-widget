@@ -46,7 +46,7 @@ describe("createRovInput", () => {
     expect(rovInput.subscribe({})).toBe(false);
   });
 
-  it("subscribes listeners and emits normalized values", () => {
+  it("subscribes listeners and emits normalized values", async () => {
     const cockpit = createCockpitStub({
       [ROV_VARIABLES.LAT]: 300000000,
       [ROV_VARIABLES.LON]: -940000000,
@@ -59,10 +59,37 @@ describe("createRovInput", () => {
 
     cockpit.listeners.get(ROV_VARIABLES.LAT)();
     cockpit.listeners.get(ROV_VARIABLES.LON)();
+    await Promise.resolve();
     cockpit.listeners.get(ROV_VARIABLES.HDG)();
+    await Promise.resolve();
 
-    expect(onUpdate).toHaveBeenNthCalledWith(1, { lat: 30 });
-    expect(onUpdate).toHaveBeenNthCalledWith(2, { lon: -94 });
-    expect(onUpdate).toHaveBeenNthCalledWith(3, { heading: 90 });
+    expect(onUpdate).toHaveBeenNthCalledWith(1, { lat: 30, lon: -94 });
+    expect(onUpdate).toHaveBeenNthCalledWith(2, { heading: 90 });
+  });
+
+  it("coalesces same-turn updates into one diagonal position emission", async () => {
+    const cockpit = createCockpitStub({
+      [ROV_VARIABLES.LAT]: 300000000,
+      [ROV_VARIABLES.LON]: -940000000,
+      [ROV_VARIABLES.HDG]: 4500,
+    });
+    const onUpdate = vi.fn();
+    const rovInput = createRovInput(cockpit);
+
+    rovInput.subscribe({ onUpdate });
+
+    cockpit.values[ROV_VARIABLES.LAT] = 300001000;
+    cockpit.listeners.get(ROV_VARIABLES.LAT)();
+    cockpit.values[ROV_VARIABLES.LON] = -940001000;
+    cockpit.listeners.get(ROV_VARIABLES.LON)();
+    cockpit.listeners.get(ROV_VARIABLES.HDG)();
+    await Promise.resolve();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith({
+      lat: 30.0001,
+      lon: -94.0001,
+      heading: 45,
+    });
   });
 });

@@ -35,6 +35,8 @@ const ROV_FIELDS = {
 
 export function createRovInput(cockpit) {
   const emptySnapshot = { lat: null, lon: null, heading: null };
+  let pendingUpdate = null;
+  let emitScheduled = false;
 
   function isAvailable() {
     return Boolean(
@@ -55,7 +57,27 @@ export function createRovInput(cockpit) {
     cockpit.listenDataLakeVariable(field.variable, function () {
       const value = readField(fieldName);
       if (value !== null && callback) {
-        callback({ [fieldName]: value });
+        pendingUpdate = {
+          ...pendingUpdate,
+          [fieldName]: value,
+        };
+
+        if (emitScheduled) {
+          return;
+        }
+
+        emitScheduled = true;
+        queueMicrotask(function () {
+          emitScheduled = false;
+
+          if (!pendingUpdate) {
+            return;
+          }
+
+          var nextUpdate = pendingUpdate;
+          pendingUpdate = null;
+          callback(nextUpdate);
+        });
       }
     });
   }

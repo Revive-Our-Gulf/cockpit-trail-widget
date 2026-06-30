@@ -30,33 +30,72 @@ function createLeafletStub() {
 }
 
 describe("createRovTrail", () => {
-  it("caps trail length and fades older segments", () => {
+  it("adds a new point only when the real position moves more than 1 meter", () => {
     var leaflet = createLeafletStub();
     var trail = createRovTrail({
       leaflet: leaflet,
-      maxPoints: 4,
-      minSegmentDistanceMeters: 0,
+      maxDistanceMeters: 200,
+      minSegmentDistanceMeters: 1,
     });
 
     trail.addTo({});
     trail.appendPoint({ lat: 29.5, lon: -95.3 });
-    trail.appendPoint({ lat: 29.50001, lon: -95.30001 });
-    trail.appendPoint({ lat: 29.50002, lon: -95.30002 });
-    trail.appendPoint({ lat: 29.50003, lon: -95.30003 });
-    trail.appendPoint({ lat: 29.50004, lon: -95.30004 });
+    trail.appendPoint({ lat: 29.500004, lon: -95.3 });
+    trail.appendPoint({ lat: 29.50002, lon: -95.3 });
 
     expect(trail.getPoints()).toEqual([
-      [29.50001, -95.30001],
-      [29.50002, -95.30002],
-      [29.50003, -95.30003],
-      [29.50004, -95.30004],
+      [29.5, -95.3],
+      [29.50002, -95.3],
+    ]);
+    expect(trail.layerGroup.layers).toHaveLength(1);
+  });
+
+  it("caps trail distance budget and fades older segments by distance", () => {
+    var leaflet = createLeafletStub();
+    var trail = createRovTrail({
+      leaflet: leaflet,
+      maxDistanceMeters: 50,
+      minSegmentDistanceMeters: 1,
+    });
+
+    trail.addTo({});
+    trail.appendPoint({ lat: 29.5, lon: -95.3 });
+    trail.appendPoint({ lat: 29.50005, lon: -95.30005 });
+    trail.appendPoint({ lat: 29.5001, lon: -95.3001 });
+    trail.appendPoint({ lat: 29.50015, lon: -95.30015 });
+
+    expect(trail.getPoints()).toEqual([
+      [29.5, -95.3],
+      [29.50005, -95.30005],
+      [29.5001, -95.3001],
+      [29.50015, -95.30015],
     ]);
     expect(trail.layerGroup.layers).toHaveLength(3);
-    expect(trail.layerGroup.layers[0].options.opacity).toBeLessThan(
+    expect(trail.layerGroup.layers[0].options.color).toBe("#a00000");
+    expect(trail.layerGroup.layers[0].options.opacity).toBeGreaterThan(
       trail.layerGroup.layers[1].options.opacity
     );
-    expect(trail.layerGroup.layers[1].options.opacity).toBeLessThan(
-      trail.layerGroup.layers[2].options.opacity
-    );
+  });
+
+  it("trims older points once the distance budget is exceeded", () => {
+    var leaflet = createLeafletStub();
+    var trail = createRovTrail({
+      leaflet: leaflet,
+      maxPoints: 10,
+      maxDistanceMeters: 20,
+      minSegmentDistanceMeters: 1,
+    });
+
+    trail.addTo({});
+    trail.appendPoint({ lat: 29.5, lon: -95.3 });
+    trail.appendPoint({ lat: 29.5001, lon: -95.3001 });
+    trail.appendPoint({ lat: 29.5002, lon: -95.3002 });
+    trail.appendPoint({ lat: 29.5003, lon: -95.3003 });
+
+    expect(trail.getPoints()).toEqual([
+      [29.5002, -95.3002],
+      [29.5003, -95.3003],
+    ]);
+    expect(trail.layerGroup.layers).toHaveLength(1);
   });
 });
